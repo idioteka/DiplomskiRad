@@ -1,0 +1,398 @@
+
+#include "config.h"
+
+int key_num;
+
+string extractGenomeFromFile(string genome_file) {
+
+	whole_genome = "";
+	FILE *inGenome = fopen(genome_file.c_str(), "r");
+	char buff[256];
+
+	while (fgets(buff, 255, inGenome)) {
+		// ignore lines that start with genome desc, they start with '>'
+		if (buff[0] != '>') {
+			string tmp = buff;
+			tmp.resize(tmp.size() - 1);  // remove endl
+			whole_genome += tmp;
+		}
+	}
+	return whole_genome;
+}
+
+int getCodeFromBase(char base) {
+	char lower_base = tolower(base);
+	if(lower_base == 'a') {
+		return 0;
+	} else if(lower_base == 'c') {
+		return 1;
+	}
+	else if(lower_base == 'g') {
+		return 2;
+	}
+	else if(lower_base == 't') {
+		return 3;
+	}
+	else return -1;
+}
+
+int getKeyFromKmer(int start, int stop) {
+	int key = 0;
+	for(int i = start; i < stop; i++) {
+		int code = getCodeFromBase(whole_genome[i]);
+		if(code < 0) {
+			return -1;
+		}
+		key = ((key<<2) | code);
+	}
+	return key;
+}
+
+int *countKeys() {
+	int *sizes = new int[keyspace] {0};
+	int start = 0;
+	int sum = 0;
+
+	while(getCodeFromBase(whole_genome[start]) < 0) {
+		start++;
+	}
+
+	for(int i = start; i < whole_genome.size()-(KEYLEN-1); i++) {
+
+		int code = getCodeFromBase(whole_genome[i]);
+		if(code >= 0) {
+			int key = getKeyFromKmer(i, i+KEYLEN);
+			if(key >= 0) {
+				sizes[key]++;
+				sum++;
+			}
+		}
+	}
+
+	return sizes;
+}
+
+int *fillArrays(int *sizes, int sum) {
+	int *sites = new int[sum];
+	int start = 0;
+
+	while(getCodeFromBase(whole_genome[start]) < 0) {
+		start++;
+	}
+
+	for(int i = start; i < whole_genome.size()-(KEYLEN-1); i++) {
+
+		int code = getCodeFromBase(whole_genome[i]);
+		if(code >= 0) {
+			int key = getKeyFromKmer(i, i+KEYLEN);
+			if(key >= 0) {
+				int location = sizes[key];
+				sites[location] = i;
+				sizes[key]++;
+			}
+		}
+	}
+	return sites;
+}
+
+void writeSizes(int *sizes) {
+	FILE* pFile;
+	pFile = fopen("sizes2", "wb");
+	fwrite(sizes, sizeof(int), keyspace, pFile);
+	fclose(pFile);
+}
+
+void writeSizes2(int *sizes) {
+	ofstream sizes_output_stream(sizes_file_name.c_str());
+	sizes_output_stream << keyspace;
+	sizes_output_stream << "\n";
+	for(int i = 0; i < keyspace; i++) {
+		sizes_output_stream << sizes[i];
+		sizes_output_stream << "\n";
+	}
+}
+
+void writeSites(int *sites, int sum) {
+	FILE* pFile;
+	pFile = fopen("sites2", "wb");
+	fwrite(sites, sizeof(int), sum, pFile);
+	fclose(pFile);
+}
+
+void writeSites2(int *sites, int sum) {
+	ofstream sizes_output_stream(sites_file_name.c_str());
+	sizes_output_stream << sum;
+	sizes_output_stream << "\n";
+	for(int i = 0; i < sum; i++) {
+		sizes_output_stream << sites[i];
+		sizes_output_stream << "\n";
+	}
+}
+
+int *readArray(string filename, bool write_sum) {
+	FILE * pFile;
+	long lSize;
+	int * buffer;
+	size_t result;
+
+	pFile = fopen ( filename.c_str() , "rb" );
+
+	// obtain file size:
+	fseek (pFile , 0 , SEEK_END);
+	lSize = ftell (pFile);
+	rewind (pFile);
+
+	// allocate memory to contain the whole file:
+	buffer = (int*) malloc (sizeof(char)*lSize);
+
+	// copy the file into the buffer:
+	result = fread (buffer,1,lSize,pFile);
+	/* the whole file is now loaded in the memory buffer. */
+
+	// terminate
+	fclose (pFile);
+	return buffer;
+}
+
+int *readArray2(string filename, bool write_sum) {
+	ifstream ifs(filename.c_str());
+	int size;
+	ifs >> size;
+	if(write_sum) key_num = size;
+	int *array = new int[size];
+	for(int i = 0; i < size; i++) {
+		ifs >> array[i];
+	}
+	return array;
+}
+
+int ** readIndex(string &whole_genome) {
+
+	whole_genome = extractGenomeFromFile(genome_file_name);
+
+	timeval t1, t2;
+	gettimeofday(&t1, NULL);
+	long startday = t1.tv_sec;
+	long startday2 = t1.tv_usec;
+
+	int *sizes = readArray("sizes", false);
+
+	gettimeofday(&t2, NULL);
+	long endday = t2.tv_sec;
+	long endday2 = t2.tv_usec;
+	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	cout << "READ SIZES: " << timefinal << endl;
+
+	gettimeofday(&t1, NULL);
+	startday = t1.tv_sec;
+	startday2 = t1.tv_usec;
+	int *sites = readArray("sites", true);
+	gettimeofday(&t2, NULL);
+	endday = t2.tv_sec;
+	endday2 = t2.tv_usec;
+
+	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	cout << "READ SITES: " << timefinal << endl;
+
+	int **result = new int*[4];
+	result[0] = new int[1];
+	result[0][0] = keyspace;
+	result[1] = sizes;
+	result[2] = new int[1];
+	result[2][0] = key_num;
+	result[3] = sites;
+	return result;
+}
+
+int ** createIndex(bool write_to_file, string &whole_genome) {
+
+	int **result = new int*[4];
+	result[0] = new int[1];
+	result[0][0] = keyspace;
+
+	whole_genome = extractGenomeFromFile(genome_file_name);
+
+	timeval t1, t2;
+	gettimeofday(&t1, NULL);
+	long startday = t1.tv_sec;
+	long startday2 = t1.tv_usec;
+
+	int *sizes = countKeys();
+
+	gettimeofday(&t2, NULL);
+	long endday = t2.tv_sec;
+	long endday2 = t2.tv_usec;
+
+	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	cout << "CREATED SIZES: " << timefinal << endl;
+
+	int sum=0;
+	for(int i = 0; i < keyspace; i++) {
+		int temp = sizes[i];
+		sizes[i] = sum;
+		sum += temp;
+	}
+	result[1] = sizes;
+	result[2] = new int[1];
+	result[2][0] = sum;
+
+	if(write_to_file) {
+		timeval t1, t2;
+		gettimeofday(&t1, NULL);
+		long startday = t1.tv_sec;
+		long startday2 = t1.tv_usec;
+		writeSizes(sizes);
+		gettimeofday(&t2, NULL);
+		long endday = t2.tv_sec;
+		long endday2 = t2.tv_usec;
+
+		double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+		cout << "WROTE SIZES: " << timefinal << endl;
+	}
+
+	gettimeofday(&t1, NULL);
+	startday = t1.tv_sec;
+	startday2 = t1.tv_usec;
+	int *sites = fillArrays(sizes, sum);
+	gettimeofday(&t2, NULL);
+	endday = t2.tv_sec;
+	endday2 = t2.tv_usec;
+	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	cout << "CREATED SITES: " << timefinal << endl;
+
+	result[3] = sites;
+
+	if(write_to_file) {
+		gettimeofday(&t1, NULL);
+		long startday = t1.tv_sec;
+		long startday2 = t1.tv_usec;
+		writeSites(sites, sum);
+		gettimeofday(&t2, NULL);
+		long endday = t2.tv_sec;
+		long endday2 = t2.tv_usec;
+		double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+		cout << "WROTE SITES: " << timefinal << endl;
+	}
+
+	return result;
+}
+
+int main2(int argc, char *argv[]) {
+
+	//cout << gi->id;
+
+	//ifstream ifs(genome_file_name.c_str());
+//	string line;
+	//int br = 1;
+
+//	whole_genome = extractGenomeFromFile(genome_file_name);
+
+//	int *sizes = countKeys();
+/*	clock_t begin_read_sizes = clock();
+
+	int *sizes = readArray(sizes_file_name, false);
+
+	clock_t end_read_sizes = clock();
+	cout << "ELAPSED READ SIZES: " << (double)(begin_read_sizes - end_read_sizes) / CLOCKS_PER_SEC << endl;
+*/
+/*
+	int tops[5] = {0};
+	int tops_keys[5] = {0};
+
+	for(int i = 0; i < keyspace; i++) {
+		if(tops[4] < sizes[i] && tops[3] < sizes[i] &&
+				tops[2] < sizes[i] && tops[1] < sizes[i] && tops[0] < sizes[i]) {
+			tops[4] = tops[3];
+			tops[3] = tops[2];
+			tops[2] = tops[1];
+			tops[1] = tops[0];
+			tops[0] = sizes[i];
+			tops_keys[4] = tops_keys[3];
+			tops_keys[3] = tops_keys[2];
+			tops_keys[2] = tops_keys[1];
+			tops_keys[1] = tops_keys[0];
+			tops_keys[0] = i;
+		}
+		else if(tops[4] < sizes[i] && tops[3] < sizes[i] &&
+				tops[2] < sizes[i] && tops[1] < sizes[i]) {
+			tops[4] = tops[3];
+			tops[3] = tops[2];
+			tops[2] = tops[1];
+			tops[1] = sizes[i];
+			tops_keys[4] = tops_keys[3];
+			tops_keys[3] = tops_keys[2];
+			tops_keys[2] = tops_keys[1];
+			tops_keys[1] = i;
+		}
+		else if (tops[4] < sizes[i] && tops[3] < sizes[i] &&
+				tops[2] < sizes[i]) {
+			tops[4] = tops[3];
+			tops[3] = tops[2];
+			tops[2] = sizes[i];
+			tops_keys[4] = tops_keys[3];
+			tops_keys[3] = tops_keys[2];
+			tops_keys[2] = i;
+		}
+		else if(tops[4] < sizes[i] && tops[3] < sizes[i]) {
+			tops[4] = tops[3];
+			tops[3] = sizes[i];
+			tops_keys[4] = tops_keys[3];
+			tops_keys[3] = i;
+		}
+		else if(tops[4] < sizes[i]) {
+			tops[4] = sizes[i];
+			tops_keys[4] = i;
+		}
+	}
+
+	for(int i = 0; i < 5; i++) {
+		cout << tops[i] << " " << tops_keys[i] << "\n";
+	}
+*/
+/*
+	int sum=0;
+	for(int i = 0; i < keyspace; i++) {
+		int temp = sizes[i];
+		sizes[i] = sum;
+		sum += temp;
+	}
+*/
+	//writeSizes(sizes);
+
+	//cout << "sum: " << sum;
+
+	//int *sites = fillArrays(sizes, sum);
+
+	/*clock_t begin_read_sites = clock();
+
+	int *sites = readArray(sites_file_name, true);
+
+	clock_t end_read_sites = clock();
+	cout << "ELAPSED READ SITES: " << (double)(begin_read_sites - end_read_sites) / CLOCKS_PER_SEC << endl;
+*/
+
+//	int **res = readIndex();
+
+	return 0;
+	//cout << res[0][0] << " " << res[2][0] << "\n";
+	//cout << res[1][10] << " " << res[3][10] << "\n";
+
+//	cout << sizes[0] << " " << sites[0];
+
+//	writeSites(sites, sum);
+
+//	for(int i = 0; i < 10; i++) {
+//		cout << sites[i] << "\n";
+//	}
+
+	//while(getline(ifs, line)) {
+		//if(line.substr(0,1) == ">") {
+		//	cout << br;
+			//cout << line;
+			//cout << "\n";
+		//}
+//		br++;
+	//}
+}
+
+
