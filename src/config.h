@@ -33,6 +33,9 @@ static string sites_file_name = "sites2.txt";
 static string reads_file_name = "test.fasta";
 */
 
+static int length_of_sites;
+static int length_of_sizes;
+
 static string genome_file_name = "chr1.fa";
 static string sizes_file_name = "sizes.txt";
 static string sites_file_name = "sites.txt";
@@ -43,6 +46,8 @@ static int minKeysDesired = 2;
 static float minKeyDensity = 1.5;
 static float keyDensity = 1.9;
 static float maxKeyDensity = 3.0;
+
+static int POINTS_INS = -395;
 
 static int MAX_LEN = 10998;
 

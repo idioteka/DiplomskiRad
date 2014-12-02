@@ -140,6 +140,9 @@ int *readArray(string filename, bool write_sum) {
 	// obtain file size:
 	fseek (pFile , 0 , SEEK_END);
 	lSize = ftell (pFile);
+	if(write_sum) {
+		key_num = lSize/4;
+	}
 	rewind (pFile);
 
 	// allocate memory to contain the whole file:
@@ -175,7 +178,7 @@ int ** readIndex(string &whole_genome) {
 	long startday = t1.tv_sec;
 	long startday2 = t1.tv_usec;
 
-	int *sizes = readArray("sizes", false);
+	int *sizes = readArray("sizes2", false);
 
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
@@ -186,13 +189,20 @@ int ** readIndex(string &whole_genome) {
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	int *sites = readArray("sites", true);
+	int *sites = readArray("sites2", true);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
 
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "READ SITES: " << timefinal << endl;
+
+	//length_of_sizes = keyspace;
+	//length_of_sites = key_num;
+
+	//length_of_sites = key_num;
+	//cout << "length of sizes: " << length_of_sizes << endl;
+	//cout << "length of sites: " << length_of_sites << endl;
 
 	int **result = new int*[4];
 	result[0] = new int[1];
@@ -273,6 +283,9 @@ int ** createIndex(bool write_to_file, string &whole_genome) {
 		double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 		cout << "WROTE SITES: " << timefinal << endl;
 	}
+
+	length_of_sites = sum;
+	length_of_sizes = keyspace;
 
 	return result;
 }

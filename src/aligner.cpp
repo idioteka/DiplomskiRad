@@ -148,11 +148,27 @@ int reverseComplementBinary(int kmer, int k){
 }
 
 int countKeyHits(int key, int *sizes) {
-	int x = sizes[key+1] - sizes[key];
+	int x;
+	if(key >= length_of_sizes) {
+		cout << "length: "  << length_of_sizes << endl;
+		cout << "key: " << key << endl;
+	}
+	if(key+1 == length_of_sizes) {
+		x = length_of_sites - sizes[key];
+	}
+	else {
+		x = sizes[key+1] - sizes[key];
+	}
 	int rkey = reverseComplementBinary(key, KEYLEN);
 	if(key == rkey) return x;
 	else {
-		int y = sizes[rkey+1] - sizes[rkey];
+		int y;
+		if(rkey+1 == length_of_sizes) {
+			y = length_of_sites - sizes[rkey];
+		}
+		else {
+			y = sizes[rkey+1] - sizes[rkey];
+		}
 		return x + y;
 	}
 }
@@ -614,6 +630,13 @@ int extendScore(string &read, vector<int> &offsets, vector<int> &values, int cen
 	return score;
 }
 
+int maxImperfectScore(string &read){
+	int maxQ=calcMaxScore(read);
+	int maxI=maxQ+min(POINTS_DEL, POINTS_INS-POINTS_MATCH2);
+	assert(maxI<(maxQ-(POINTS_MATCH2+POINTS_MATCH2)+(POINTS_MATCH+POINTS_SUB)));
+	return maxI;
+}
+
 /*
  *
  * HELP FUNCTIONS
@@ -785,8 +808,7 @@ void findMaxQscore2(vector<int> &starts, vector<int> &stops, vector<int> &offset
 	return;
 }
 
-
-vector<vector<int> > prescanAllBlocks(int bestScores[], vector<int> &keysP, vector<int> &offsetsP,
+void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], vector<int> &keysP, vector<int> &offsetsP,
 		vector<int> &keysM, vector<int> &offsetsM, bool allBasesCovered, int *sizes, int *sites){
 
 //	cout << "offsets.size(): " << offsetsP.size() << ", offsetsM.size(): " << offsetsM.size() << "\n";
@@ -799,7 +821,9 @@ vector<vector<int> > prescanAllBlocks(int bestScores[], vector<int> &keysP, vect
 
 	vector<int> counts;
 	vector<int> scores;
-	vector<vector<int> > ret;
+	prescanResults.push_back(counts);
+	prescanResults.push_back(scores);
+	//vector<vector<int> > ret;
 
 	vector<int> keys = keysP;
 	vector<int> offsets = offsetsP;
@@ -810,8 +834,10 @@ vector<vector<int> > prescanAllBlocks(int bestScores[], vector<int> &keysP, vect
 	int numHits = getHits(keys, std::numeric_limits<int>::max(), starts, stops, sizes);
 
 	if(numHits < minHitsToScore){
-		scores.push_back(-9999);
-		counts.push_back(0);
+		//scores.push_back(-9999);
+		//counts.push_back(0);
+		prescanResults[0].push_back(0);
+		prescanResults[1].push_back(-9999);
 	}else{
 
 		if(numHits < (int) keys.size()){
@@ -831,8 +857,10 @@ vector<vector<int> > prescanAllBlocks(int bestScores[], vector<int> &keysP, vect
 		findMaxQscore2(starts, stops, offsets, triples, values, keys, minHitsToScore, true,
 				bestqscore>=maxQuickScore_ && allBasesCovered, sizes, sites, temp);
 
-		scores.push_back(temp[0]);
-		counts.push_back(temp[1]);
+		//scores.push_back(temp[0]);
+		//counts.push_back(temp[1]);
+		prescanResults[0].push_back(temp[1]);
+		prescanResults[1].push_back(temp[0]);
 
 		bestqscore = max(temp[0], bestqscore);
 		maxHits = max(maxHits, temp[1]);
@@ -841,9 +869,9 @@ vector<vector<int> > prescanAllBlocks(int bestScores[], vector<int> &keysP, vect
 			minHitsToScore=max(minHitsToScore, maxHits);
 			bestScores[1]=max(bestScores[1], maxHits);
 			bestScores[3]=max(bestScores[3], bestqscore);
-			ret.push_back(counts);
-			ret.push_back(scores);
-			return ret;
+			//prescanResults.push_back(counts);
+			//prescanResults.push_back(scores);
+			return;
 		}
 	}
 	keys.clear();
@@ -857,8 +885,10 @@ vector<vector<int> > prescanAllBlocks(int bestScores[], vector<int> &keysP, vect
 	numHits = getHits(keys, std::numeric_limits<int>::max(), starts, stops, sizes);
 
 	if(numHits < minHitsToScore){
-		scores.push_back(-9999);
-		counts.push_back(0);
+		//scores.push_back(-9999);
+		//counts.push_back(0);
+		prescanResults[0].push_back(0);
+		prescanResults[1].push_back(-9999);
 	}else{
 
 		if(numHits < (int) keys.size()){
@@ -878,8 +908,11 @@ vector<vector<int> > prescanAllBlocks(int bestScores[], vector<int> &keysP, vect
 		findMaxQscore2(starts, stops, offsets, triples, values, keys, minHitsToScore, true,
 				bestqscore>=maxQuickScore_ && allBasesCovered, sizes, sites, temp);
 
-		scores.push_back(temp[0]);
-		counts.push_back(temp[1]);
+		//scores.push_back(temp[0]);
+		//counts.push_back(temp[1]);
+
+		prescanResults[0].push_back(temp[1]);
+		prescanResults[1].push_back(temp[0]);
 
 		bestqscore = max(temp[0], bestqscore);
 		maxHits = max(maxHits, temp[1]);
@@ -888,9 +921,9 @@ vector<vector<int> > prescanAllBlocks(int bestScores[], vector<int> &keysP, vect
 			minHitsToScore=max(minHitsToScore, maxHits);
 			bestScores[1]=max(bestScores[1], maxHits);
 			bestScores[3]=max(bestScores[3], bestqscore);
-			ret.push_back(counts);
-			ret.push_back(scores);
-			return ret;
+			//prescanResults.push_back(counts);
+			//prescanResults.push_back(scores);
+			return;
 		}
 	}
 
@@ -898,9 +931,9 @@ vector<vector<int> > prescanAllBlocks(int bestScores[], vector<int> &keysP, vect
 	bestScores[1]=max(bestScores[1], maxHits);
 	bestScores[3]=max(bestScores[3], bestqscore);
 
-	ret.push_back(counts);
-	ret.push_back(scores);
-	return ret;
+	//prescanResults.push_back(counts);
+	//prescanResults.push_back(scores);
+	return;
 }
 
 /*
@@ -988,7 +1021,7 @@ int scoreNoIndelsAndMakeMatchString(string &read, string &ref, int refStart, str
 			score+=POINTS_NOREF;
 			match.push_back('N');
 		}else{
-			match.push_back('S');
+			match.push_back('s');
 			if(mode == MODE_SUB) {timeInMode++;}
 			else{timeInMode=0;}
 
@@ -1221,7 +1254,6 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 	max[1] = maxCol;
 	max[2] = maxState;
 	max[3] = maxScore;
-
 }
 
 void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int row, int col, int state, string &out, vector<vector<vector<int> > > &packed) {
@@ -1374,6 +1406,7 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 	else {
 		grefLimit = makeGref(ref, gaps, (refStartLoc - MARIC_PADDING), (refEndLoc + MARIC_PADDING), gref);
 	}
+	//cout << gref << endl;
 	int rows = read.size();
 	int columns = grefLimit+1;
 	vector<vector<vector<int> > > packed;
@@ -1465,11 +1498,26 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 }
 
 void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, Result &r) {
+
+	if(ss.perfect) {
+		r.matchString = "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm";
+		r.start = ss.start;
+		r.stop = ss.stop;
+		return;
+	}
+
 	string match;
 	int score = scoreNoIndelsAndMakeMatchString(read, whole_genome, ss.start, match);
+	int imperfectScore = maxImperfectScore(read);
+	if(score > imperfectScore) {
+		r.start = ss.start;
+		r.stop = ss.stop;
+		r.matchString = match;
+		return;
+	}
 
 	int max[4];
-	//fillLimited(read, whole_genome, ss.start, ss.stop, score, ss.gapArray, max, r);
+	fillLimited(read, whole_genome, ss.start, ss.stop, score, ss.gapArray, max, r);
 }
 
 void makeMatchString(vector<SiteScore> &results, string &read, string &read_reverse, int *sizes, int *sites, vector<Result> &resultsFinal) {
@@ -1789,7 +1837,8 @@ void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFi
 	reverseComplementKeys(keys_reversed, read_keys_final, KEYLEN);
 
 	if(prescan_qscore){
-		vector<vector<int> > prescanResults = prescanAllBlocks(bestScores, read_keys_final, offsets,
+		vector<vector<int> > prescanResults;
+		prescanAllBlocks(prescanResults, bestScores, read_keys_final, offsets,
 				keys_reversed, offsets_reversed, pretend_all_bases_covered, sizes, sites);
 
 		precounts=prescanResults[0];
@@ -1838,10 +1887,20 @@ void writeResults(vector<Result> results) {
 }
 
 int main(int argc, char *argv[]) {
-	int **res = readIndex(whole_genome);
+	bool read = true;
+	int **res;
+	if(read) {
+		res = readIndex(whole_genome);
+	}
+	else {
+		res = createIndex(true, whole_genome);
+	}
 
 	int *sizes = res[1];
 	int *sites = res[3];
+
+	length_of_sizes = res[0][0];
+	length_of_sites = res[2][0];
 
 	vector<string> reads;
 	readReads(reads);
@@ -1868,6 +1927,19 @@ int main(int argc, char *argv[]) {
 	cout << "END" << endl;
 
 	writeResults(results);
+
+	if(read) {
+		free(sizes);
+		free(sites);
+	}
+	else {
+		delete [] sizes;
+		delete [] sites;
+	}
+
+	delete [] res[0];
+	delete [] res[2];
+	delete [] res;
 
 	return 0;
 }
