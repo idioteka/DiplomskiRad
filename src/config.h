@@ -20,7 +20,7 @@
 
 using namespace std;
 
-static string whole_genome;
+//static string whole_genome;
 
 static string constant_array_scores = "constScoreArrays.txt";
 

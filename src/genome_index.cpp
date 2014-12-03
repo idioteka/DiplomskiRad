@@ -3,9 +3,9 @@
 
 int key_num;
 
-string extractGenomeFromFile(string genome_file) {
+void extractGenomeFromFile(string genome_file, string &whole_genome) {
 
-	whole_genome = "";
+	//whole_genome = "";
 	FILE *inGenome = fopen(genome_file.c_str(), "r");
 	char buff[256];
 
@@ -17,7 +17,7 @@ string extractGenomeFromFile(string genome_file) {
 			whole_genome += tmp;
 		}
 	}
-	return whole_genome;
+	//return whole_genome;
 }
 
 int getCodeFromBase(char base) {
@@ -36,7 +36,7 @@ int getCodeFromBase(char base) {
 	else return -1;
 }
 
-int getKeyFromKmer(int start, int stop) {
+int getKeyFromKmer(string &whole_genome, int start, int stop) {
 	int key = 0;
 	for(int i = start; i < stop; i++) {
 		int code = getCodeFromBase(whole_genome[i]);
@@ -48,7 +48,7 @@ int getKeyFromKmer(int start, int stop) {
 	return key;
 }
 
-int *countKeys() {
+int *countKeys(string &whole_genome) {
 	int *sizes = new int[keyspace] {0};
 	int start = 0;
 	int sum = 0;
@@ -57,11 +57,11 @@ int *countKeys() {
 		start++;
 	}
 
-	for(int i = start; i < whole_genome.size()-(KEYLEN-1); i++) {
+	for(unsigned int i = start; i < whole_genome.size()-(KEYLEN-1); i++) {
 
 		int code = getCodeFromBase(whole_genome[i]);
 		if(code >= 0) {
-			int key = getKeyFromKmer(i, i+KEYLEN);
+			int key = getKeyFromKmer(whole_genome, i, i+KEYLEN);
 			if(key >= 0) {
 				sizes[key]++;
 				sum++;
@@ -72,7 +72,7 @@ int *countKeys() {
 	return sizes;
 }
 
-int *fillArrays(int *sizes, int sum) {
+int *fillArrays(int *sizes, int sum, string &whole_genome) {
 	int *sites = new int[sum];
 	int start = 0;
 
@@ -80,11 +80,11 @@ int *fillArrays(int *sizes, int sum) {
 		start++;
 	}
 
-	for(int i = start; i < whole_genome.size()-(KEYLEN-1); i++) {
+	for(unsigned int i = start; i < whole_genome.size()-(KEYLEN-1); i++) {
 
 		int code = getCodeFromBase(whole_genome[i]);
 		if(code >= 0) {
-			int key = getKeyFromKmer(i, i+KEYLEN);
+			int key = getKeyFromKmer(whole_genome, i, i+KEYLEN);
 			if(key >= 0) {
 				int location = sizes[key];
 				sites[location] = i;
@@ -97,7 +97,7 @@ int *fillArrays(int *sizes, int sum) {
 
 void writeSizes(int *sizes) {
 	FILE* pFile;
-	pFile = fopen("sizes2", "wb");
+	pFile = fopen("sizes", "wb");
 	fwrite(sizes, sizeof(int), keyspace, pFile);
 	fclose(pFile);
 }
@@ -114,7 +114,7 @@ void writeSizes2(int *sizes) {
 
 void writeSites(int *sites, int sum) {
 	FILE* pFile;
-	pFile = fopen("sites2", "wb");
+	pFile = fopen("sites", "wb");
 	fwrite(sites, sizeof(int), sum, pFile);
 	fclose(pFile);
 }
@@ -171,14 +171,14 @@ int *readArray2(string filename, bool write_sum) {
 
 int ** readIndex(string &whole_genome) {
 
-	whole_genome = extractGenomeFromFile(genome_file_name);
+	extractGenomeFromFile(genome_file_name, whole_genome);
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
 	long startday = t1.tv_sec;
 	long startday2 = t1.tv_usec;
 
-	int *sizes = readArray("sizes2", false);
+	int *sizes = readArray("sizes", false);
 
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
@@ -189,7 +189,7 @@ int ** readIndex(string &whole_genome) {
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	int *sites = readArray("sites2", true);
+	int *sites = readArray("sites", true);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
@@ -216,18 +216,14 @@ int ** readIndex(string &whole_genome) {
 
 int ** createIndex(bool write_to_file, string &whole_genome) {
 
-	int **result = new int*[4];
-	result[0] = new int[1];
-	result[0][0] = keyspace;
-
-	whole_genome = extractGenomeFromFile(genome_file_name);
+	extractGenomeFromFile(genome_file_name, whole_genome);
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
 	long startday = t1.tv_sec;
 	long startday2 = t1.tv_usec;
 
-	int *sizes = countKeys();
+	int *sizes = countKeys(whole_genome);
 
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
@@ -242,9 +238,6 @@ int ** createIndex(bool write_to_file, string &whole_genome) {
 		sizes[i] = sum;
 		sum += temp;
 	}
-	result[1] = sizes;
-	result[2] = new int[1];
-	result[2][0] = sum;
 
 	if(write_to_file) {
 		timeval t1, t2;
@@ -263,14 +256,12 @@ int ** createIndex(bool write_to_file, string &whole_genome) {
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	int *sites = fillArrays(sizes, sum);
+	int *sites = fillArrays(sizes, sum, whole_genome);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "CREATED SITES: " << timefinal << endl;
-
-	result[3] = sites;
 
 	if(write_to_file) {
 		gettimeofday(&t1, NULL);
@@ -284,8 +275,19 @@ int ** createIndex(bool write_to_file, string &whole_genome) {
 		cout << "WROTE SITES: " << timefinal << endl;
 	}
 
-	length_of_sites = sum;
-	length_of_sizes = keyspace;
+	for(int i = keyspace-1; i > 0; i--) {
+		sizes[i] = sizes[i-1];
+	}
+	sizes[0] = 0;
+
+	int **result = new int*[4];
+	result[0] = new int[1];
+	result[0][0] = keyspace;
+	result[1] = sizes;
+	result[2] = new int[1];
+	result[2][0] = sum;
+	result[3] = sites;
+	return result;
 
 	return result;
 }

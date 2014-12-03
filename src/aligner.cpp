@@ -540,7 +540,7 @@ int calcAffineScore(vector<int> &loc_array, string &read) {
 	return score;
 }
 
-int extendScore(string &read, vector<int> &offsets, vector<int> &values, int center_index, vector<int> &loc_array, int num_hits, int num_approx_hits) {
+int extendScore(string &read, vector<int> &offsets, vector<int> &values, int center_index, vector<int> &loc_array, int num_hits, int num_approx_hits, string &whole_genome) {
 
 	int center_loc = values[center_index];
 	int min_loc = center_loc - MAX_INDEL;
@@ -1400,7 +1400,7 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 	int grefLimit = (refEndLoc - refStartLoc) + 2 * MARIC_PADDING;
 	if((int)gaps.size() == 0) {
 		for(int i = refStartLoc-MARIC_PADDING; i < refEndLoc + MARIC_PADDING; i++) {
-			gref.push_back(whole_genome[i]);
+			gref.push_back(ref[i]);
 		}
 	}
 	else {
@@ -1497,7 +1497,7 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 	*/
 }
 
-void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, Result &r) {
+void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, Result &r, string &whole_genome) {
 
 	if(ss.perfect) {
 		r.matchString = "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm";
@@ -1520,7 +1520,7 @@ void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, 
 	fillLimited(read, whole_genome, ss.start, ss.stop, score, ss.gapArray, max, r);
 }
 
-void makeMatchString(vector<SiteScore> &results, string &read, string &read_reverse, int *sizes, int *sites, vector<Result> &resultsFinal) {
+void makeMatchString(vector<SiteScore> &results, string &read, string &read_reverse, int *sizes, int *sites, vector<Result> &resultsFinal, string &whole_genome) {
 	int max_score = -9999;
 	SiteScore ss;
 	for(unsigned int i = 0; i < results.size(); i++) {
@@ -1531,10 +1531,10 @@ void makeMatchString(vector<SiteScore> &results, string &read, string &read_reve
 	}
 	Result r = Result(ss.start, ss.stop);
 	if(ss.strand == 0) {
-		makeMatchStringForSite(ss, read, sizes, sites, r);
+		makeMatchStringForSite(ss, read, sizes, sites, r, whole_genome);
 	}
 	else {
-		makeMatchStringForSite(ss, read_reverse, sizes, sites, r);
+		makeMatchStringForSite(ss, read_reverse, sizes, sites, r, whole_genome);
 	}
 	resultsFinal.push_back(r);
 }
@@ -1548,7 +1548,7 @@ void makeMatchString(vector<SiteScore> &results, string &read, string &read_reve
 
 void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offsets, int *sizes,
 		int *sites, vector<SiteScore> &results, bool all_bases_covered,
-		int max_score, int max_quick_score, bool fully_defined, int strand) {
+		int max_score, int max_quick_score, bool fully_defined, int strand, string &whole_genome) {
 	vector<int> starts;
 	vector<int> stops;
 	int get_hits = getHits(keys, MAX_LEN, starts, stops, sizes);
@@ -1633,7 +1633,7 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 				if(short_circuit && qscore == max_quick_score){
 					score = max_score;
 				}else{
-					score = extendScore(read, offsets, sites_tmp, center_index, loc_array, get_hits, approx_hits);
+					score = extendScore(read, offsets, sites_tmp, center_index, loc_array, get_hits, approx_hits, whole_genome);
 
 					int min = std::numeric_limits<int>::max();
 					int max = std::numeric_limits<int>::min();
@@ -1793,7 +1793,7 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 	}
 }
 
-void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFinal) {
+void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFinal, string &whole_genome) {
 
 	string read_reverse;
 	reverseComplementRead(read_reverse, read);
@@ -1863,13 +1863,13 @@ void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFi
 	bool fully_defined = isFullyDefined(read);
 
 	if(precounts[0] >= hitsCutoff && prescores[0] >= qscoreCutoff) {
-		align(bestScores, read_keys_final, read, offsets, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 0);
+		align(bestScores, read_keys_final, read, offsets, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 0, whole_genome);
 	}
 	if(precounts[1] >= hitsCutoff && prescores[1] >= qscoreCutoff) {
-		align(bestScores, keys_reversed, read_reverse, offsets_reversed, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 1);
+		align(bestScores, keys_reversed, read_reverse, offsets_reversed, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 1, whole_genome);
 	}
 
-	makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal);
+	makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome);
 
 	return;
 }
@@ -1887,13 +1887,15 @@ void writeResults(vector<Result> results) {
 }
 
 int main(int argc, char *argv[]) {
-	bool read = true;
+	bool read = false;
+	string whole_genome;
+
 	int **res;
 	if(read) {
 		res = readIndex(whole_genome);
 	}
 	else {
-		res = createIndex(true, whole_genome);
+		res = createIndex(false, whole_genome);
 	}
 
 	int *sizes = res[1];
@@ -1915,7 +1917,7 @@ int main(int argc, char *argv[]) {
 	vector<Result> results;
 	for(unsigned int i = 0; i < reads.size(); i++) {
 		//cout << (i+1) << "------------------- \n";
-		processRead(sizes, sites, reads[i], results);
+		processRead(sizes, sites, reads[i], results, whole_genome);
 	}
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
