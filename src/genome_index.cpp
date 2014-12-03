@@ -3,6 +3,35 @@
 
 int key_num;
 
+struct ThreadData {
+	int thread_id;
+	int *array;
+	string *whole_genome;
+	ThreadData() {
+	}
+	ThreadData(int thread_id_, int *array_, string *whole_genome_) {
+		thread_id = thread_id_;
+		array = array_;
+		whole_genome = whole_genome_;
+	}
+};
+
+struct ThreadData2 {
+	int thread_id;
+	int *array;
+	int *sizes;
+	string *whole_genome;
+	ThreadData2() {
+
+	}
+	ThreadData2(int thread_id_, int *array_, int *sizes_, string &whole_genome_) {
+		thread_id = thread_id_;
+		array = array_;
+		sizes = sizes_;
+		whole_genome = &whole_genome_;
+	}
+};
+
 void extractGenomeFromFile(string genome_file, string &whole_genome) {
 
 	//whole_genome = "";
@@ -48,6 +77,36 @@ int getKeyFromKmer(string &whole_genome, int start, int stop) {
 	return key;
 }
 
+
+void *countKeys(void *threadid) {
+	clock_t sat = clock();
+	ThreadData *td = (ThreadData *) threadid;
+
+	//int *sizes = (*td).array;
+	//cout << "threadid: " << td->thread_id << "\n";
+	int start = 0;
+	int sum = 0;
+
+	while(getCodeFromBase(td->whole_genome[0][start]) < 0) {
+		start++;
+	}
+
+	for(unsigned int i = start; i < td->whole_genome[0].size()-(KEYLEN-1); i++) {
+		if(getCodeFromBase(td->whole_genome[0][i]) == (*td).thread_id) {
+			int code = getCodeFromBase(td->whole_genome[0][i]);
+			if(code >= 0) {
+				int key = getKeyFromKmer(td->whole_genome[0], i, i+KEYLEN);
+				if(key >= 0) {
+					(*td).array[key]++;
+					sum++;
+				}
+			}
+		}
+	}
+
+	pthread_exit(NULL);
+}
+/*
 int *countKeys(string &whole_genome) {
 	int *sizes = new int[keyspace] {0};
 	int start = 0;
@@ -71,7 +130,36 @@ int *countKeys(string &whole_genome) {
 
 	return sizes;
 }
+*/
 
+
+void *fillArrays(void *threadid) {
+	ThreadData2 *td = (ThreadData2 *) threadid;
+	int start = 0;
+	//cout << "fill threadid: " << td->thread_id << "\n";
+	//int *sites = (*td).array;
+	//int *sizes = (*td).array;
+
+	while(getCodeFromBase(td->whole_genome[0][start]) < 0) {
+		start++;
+	}
+
+	for(unsigned int i = start; i < td->whole_genome[0].size()-(KEYLEN-1); i++) {
+		if(getCodeFromBase(td->whole_genome[0][i]) == (*td).thread_id) {
+			int code = getCodeFromBase(td->whole_genome[0][i]);
+			if(code >= 0) {
+				int key = getKeyFromKmer(td->whole_genome[0], i, i+KEYLEN);
+				if(key >= 0) {
+					int location = (*td).sizes[key];
+					(*td).array[location] = i;
+					(*td).sizes[key]++;
+				}
+			}
+		}
+	}
+	pthread_exit(NULL);
+}
+/*
 int *fillArrays(int *sizes, int sum, string &whole_genome) {
 	int *sites = new int[sum];
 	int start = 0;
@@ -94,6 +182,7 @@ int *fillArrays(int *sizes, int sum, string &whole_genome) {
 	}
 	return sites;
 }
+*/
 
 void writeSizes(int *sizes) {
 	FILE* pFile;
@@ -133,7 +222,6 @@ int *readArray(string filename, bool write_sum) {
 	FILE * pFile;
 	long lSize;
 	int * buffer;
-	size_t result;
 
 	pFile = fopen ( filename.c_str() , "rb" );
 
@@ -149,7 +237,7 @@ int *readArray(string filename, bool write_sum) {
 	buffer = (int*) malloc (sizeof(char)*lSize);
 
 	// copy the file into the buffer:
-	result = fread (buffer,1,lSize,pFile);
+	fread (buffer,1,lSize,pFile);
 	/* the whole file is now loaded in the memory buffer. */
 
 	// terminate
@@ -223,7 +311,38 @@ int ** createIndex(bool write_to_file, string &whole_genome) {
 	long startday = t1.tv_sec;
 	long startday2 = t1.tv_usec;
 
-	int *sizes = countKeys(whole_genome);
+
+	pthread_t threads[4];
+	int rc;
+	int *sizes = new int[keyspace] {0};
+	pthread_attr_t attr;
+	void *status;
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	ThreadData threadDatas[4];
+
+	for(int i = 0; i < 4; i++) {
+		threadDatas[i] = ThreadData(i, sizes, &whole_genome);
+	}
+
+	for(int i = 0; i < 4; i++) {
+		//ThreadData td = ThreadData(i, sizes);
+		rc = pthread_create(&threads[i], NULL, countKeys, (void *) &threadDatas[i]);
+	}
+	pthread_attr_destroy(&attr);
+
+	for(int i=0; i < 4; i++ ){
+		rc = pthread_join(threads[i], &status);
+		if (rc){
+			cout << "Error:unable to join," << rc << endl;
+			exit(-1);
+		}
+		cout << "Main: completed thread id :" << i ;
+		cout << "  exiting with status :" << status << endl;
+	}
+
+	//int *sizes = countKeys(whole_genome);
 
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
@@ -253,10 +372,37 @@ int ** createIndex(bool write_to_file, string &whole_genome) {
 		cout << "WROTE SIZES: " << timefinal << endl;
 	}
 
+
+
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	int *sites = fillArrays(sizes, sum, whole_genome);
+
+
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	pthread_t threads2[4];
+	ThreadData2 threadDatas2[4];
+	int *sites = new int[sum];
+	for(int i = 0; i < 4; i++) {
+		threadDatas2[i] =ThreadData2(i, sites, sizes, whole_genome);
+	}
+	for(int i = 0; i < 4; i++) {
+		rc = pthread_create(&threads2[i], NULL, fillArrays, (void *)&threadDatas2[i]);
+	}
+	pthread_attr_destroy(&attr);
+	for(int i=0; i < 4; i++ ){
+		rc = pthread_join(threads2[i], &status);
+		if (rc){
+			cout << "Error:unable to join," << rc << endl;
+			exit(-1);
+		}
+		cout << "Main: completed thread id :" << i ;
+		cout << "  exiting with status :" << status << endl;
+	}
+
+	//int *sites = fillArrays(sizes, sum, whole_genome);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;

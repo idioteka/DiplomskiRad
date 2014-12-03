@@ -1887,7 +1887,7 @@ void writeResults(vector<Result> results) {
 }
 
 int main(int argc, char *argv[]) {
-	bool read = false;
+	bool read = true;
 	string whole_genome;
 
 	int **res;
