@@ -2,18 +2,17 @@
 #include "config.h"
 #include "heap.h"
 
-vector<Triplet> array;
-int size_ = 0;
-int CAPACITY;
+Heap::Heap() {
+	size_ = 0;
+}
 
-
-int compare(Triplet &t1, Triplet &t2) {
+int Heap::compare(Triplet &t1, Triplet &t2) {
 	int x = t1.site - t2.site;
 	if(x != 0) return x;
 	return t1.column - t2.column;
 }
 
-void percDown(int loc){
+void Heap::percDown(int loc){
 
 	if(loc == 1) {
 		return;
@@ -33,7 +32,7 @@ void percDown(int loc){
 	array[loc]=a;
 }
 
-void percUp(int loc){
+void Heap::percUp(int loc){
 	int next1 = loc * 2;
 	int next2 = next1 + 1;
 	if(next1 > size_) {
@@ -67,7 +66,7 @@ void percUp(int loc){
 	}
 }
 
-void initHeap(int max_size) {
+void Heap::initHeap(int max_size) {
 	CAPACITY = max_size;
 	Triplet t;
 	array.clear();
@@ -75,19 +74,19 @@ void initHeap(int max_size) {
 
 }
 
-void add(Triplet &t) {
+void Heap::add(Triplet &t) {
 	size_++;
 	array.push_back(t);
 	percDown(size_);
 }
 
-Triplet peek() {
+Triplet Heap::peek() {
 	if(size_ == 0) {
 		return array[0];
 	}
 	return array[1];
 }
-Triplet poll(){
+Triplet Heap::poll(){
 	if(size_ == 0) {
 		return array[0];
 	}
@@ -101,15 +100,15 @@ Triplet poll(){
 	return t;
 }
 
-bool isEmpty() {
+bool Heap::isEmpty() {
 	return size_ == 0;
 }
 
-void clear() {
+void Heap::clear() {
 	size_ = 0;
 }
 
-int size() {
+int Heap::size() {
 	return size_;
 }
 

@@ -3,14 +3,41 @@
 #include "heap.h"
 
 struct Result {
+	int br;
 	int start;
 	int stop;
 	string matchString;
-	Result(int start_, int stop_) {
+	Result(int br_, int start_, int stop_) {
+		br = br_;
 		start = start_;
 		stop = stop_;
 	}
 };
+
+
+struct ThreadData3 {
+	int thread_id;
+	int *sizes;
+	int *sites;
+	vector<string> *reads;
+	int start;
+	int stop;
+	string *whole_genome;
+	vector<Result> *results;
+	ThreadData3() {
+	}
+	ThreadData3(int thread_id_, int *sizes_, int *sites_, vector<string> *reads_, int start_, int stop_, string *whole_genome_, vector<Result> *results_) {
+		thread_id = thread_id_;
+		sizes = sizes_;
+		sites = sites_;
+		reads = reads_;
+		start = start_;
+		stop = stop_;
+		whole_genome = whole_genome_;
+		results = results_;
+	}
+};
+
 
 struct SiteScore {
 	int start;
@@ -706,9 +733,9 @@ void findMaxQscore2(vector<int> &starts, vector<int> &stops, vector<int> &offset
 		  int prevMaxHits, bool earlyExit, bool perfectOnly, int *sizes, int *sites, vector<int> &temp){
 
 	int numHits = offsets.size();
-
-	initHeap(offsets.size());
-	clear();
+	Heap heap = Heap();
+	heap.initHeap(offsets.size());
+	heap.clear();
 	for(int i = 0; i < numHits; i++){
 		int start=starts[i];
 		int a=sites[start];
@@ -717,7 +744,7 @@ void findMaxQscore2(vector<int> &starts, vector<int> &stops, vector<int> &offset
 		Triplet t(i, start, a2);
 		values.push_back(a2);
 
-		add(t);
+		heap.add(t);
 	}
 
 	int maxQuickScore_=calcMaxQuickScore(offsets, keys);
@@ -736,8 +763,8 @@ void findMaxQscore2(vector<int> &starts, vector<int> &stops, vector<int> &offset
 		indelCutoff=MAX_INDEL2;
 	}
 
-	while(!isEmpty()){
-		Triplet t=peek();
+	while(!heap.isEmpty()){
+		Triplet t=heap.peek();
 		int site=t.site;
 		int centerIndex=t.column;
 
@@ -782,8 +809,8 @@ void findMaxQscore2(vector<int> &starts, vector<int> &stops, vector<int> &offset
 			}
 		}
 
-		while(peek().site==site){ //Remove all identical elements, and add subsequent elements
-			Triplet t2=poll();
+		while(heap.peek().site==site){ //Remove all identical elements, and add subsequent elements
+			Triplet t2=heap.poll();
 
 			int row=t2.row+1, col=t2.column;
 			if(row<stops[col]){
@@ -793,13 +820,13 @@ void findMaxQscore2(vector<int> &starts, vector<int> &stops, vector<int> &offset
 
 				t2.site=a2;
 				values[col]=a2;
-				add(t2);
-			}else if(earlyExit && (perfectOnly || size()<approxHitsCutoff)){
+				heap.add(t2);
+			}else if(earlyExit && (perfectOnly || heap.size()<approxHitsCutoff)){
 				temp.push_back(topQscore);
 				temp.push_back(maxHits);
 				return;
 			}
-			if(isEmpty()){break;}
+			if(heap.isEmpty()){break;}
 		}
 
 	}
@@ -849,7 +876,7 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 			}
 		}
 
-		clear();
+		//heap.clear();
 		vector<Triplet> triples;
 		vector<int> values;
 
@@ -900,7 +927,7 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 			}
 		}
 
-		clear();
+		//heap.clear();
 		vector<Triplet> triples;
 		vector<int> values;
 
@@ -1497,7 +1524,7 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 	*/
 }
 
-void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, Result &r, string &whole_genome) {
+void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, Result &r, string &whole_genome, int threadId) {
 
 	if(ss.perfect) {
 		r.matchString = "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm";
@@ -1520,7 +1547,7 @@ void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, 
 	fillLimited(read, whole_genome, ss.start, ss.stop, score, ss.gapArray, max, r);
 }
 
-void makeMatchString(vector<SiteScore> &results, string &read, string &read_reverse, int *sizes, int *sites, vector<Result> &resultsFinal, string &whole_genome) {
+void makeMatchString(vector<SiteScore> &results, string &read, string &read_reverse, int *sizes, int *sites, vector<Result> &resultsFinal, string &whole_genome, int threadId, int br) {
 	int max_score = -9999;
 	SiteScore ss;
 	for(unsigned int i = 0; i < results.size(); i++) {
@@ -1529,12 +1556,12 @@ void makeMatchString(vector<SiteScore> &results, string &read, string &read_reve
 			ss = results[i];
 		}
 	}
-	Result r = Result(ss.start, ss.stop);
+	Result r = Result(br, ss.start, ss.stop);
 	if(ss.strand == 0) {
-		makeMatchStringForSite(ss, read, sizes, sites, r, whole_genome);
+		makeMatchStringForSite(ss, read, sizes, sites, r, whole_genome, threadId);
 	}
 	else {
-		makeMatchStringForSite(ss, read_reverse, sizes, sites, r, whole_genome);
+		makeMatchStringForSite(ss, read_reverse, sizes, sites, r, whole_genome, threadId);
 	}
 	resultsFinal.push_back(r);
 }
@@ -1575,9 +1602,11 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 		qcutoff = max(qcutoff, (int)(max_quick_score*DYNAMIC_QSCORE_THRESH_PERFECT));
 	}
 
+	Heap heap = Heap();
+
 	vector<int> sites_tmp;
-	clear();
-	initHeap(offsets.size());
+	heap.clear();
+	heap.initHeap(offsets.size());
 
 	for(int i = 0; i < get_hits; i++){
 		int start = starts[i];
@@ -1588,7 +1617,7 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 		Triplet t(i, start, a2);
 		sites_tmp.push_back(a2);
 
-		add(t);
+		heap.add(t);
 	}
 	if(write_output) cout << "\n";
 
@@ -1597,8 +1626,10 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 
 	int numberOfSites = 0;
 
-	while(!isEmpty()) {
-		Triplet t = peek();
+
+
+	while(!heap.isEmpty()) {
+		Triplet t = heap.peek();
 		int site = t.site;
 		int center_index = t.column;
 		int max_nearby_site = site;
@@ -1763,7 +1794,7 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 						if(isNull(prevSS) == true || !prevSS.perfect || overlap(ss.start, ss.stop, prevSS.start, prevSS.stop)){
 							perfects_found++;
 							if(perfects_found >= 2) {
-								clear();
+								heap.clear();
 								break;
 							}
 						}
@@ -1773,9 +1804,9 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 			}
 		}
 
-		while(peek().site == site){
+		while(heap.peek().site == site){
 
-			Triplet t2 = poll();
+			Triplet t2 = heap.poll();
 			int row = t2.row+1;
 			int col = t2.column;
 			if(row < stops[col]){
@@ -1784,16 +1815,16 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 				int a2 = a-offsets[col];
 				t2.site = a2;
 				sites_tmp[col]=a2;
-				add(t2);
+				heap.add(t2);
 			}
-			else if(size() < approx_hits_cutoff){
+			else if(heap.size() < approx_hits_cutoff){
 				return;
 			}
 		}
 	}
 }
 
-void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFinal, string &whole_genome) {
+void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFinal, string &whole_genome, int threadId, int br) {
 
 	string read_reverse;
 	reverseComplementRead(read_reverse, read);
@@ -1869,7 +1900,7 @@ void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFi
 		align(bestScores, keys_reversed, read_reverse, offsets_reversed, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 1, whole_genome);
 	}
 
-	makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome);
+	makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br);
 
 	return;
 }
@@ -1880,11 +1911,23 @@ void writeResults(vector<Result> results) {
 	int br = 1;
 	for(unsigned int i = 0; i < results.size(); i++) {
 		Result r = results[i];
-		out_res << br << "-" << r.start << "-" << r.stop << "-" << (r.stop-r.start) << endl;
+		out_res << r.br << "-" << r.start << "-" << r.stop << "-" << (r.stop-r.start) << endl;
 		out_res << r.matchString << endl;
 		br++;
 	}
 }
+
+
+void *preProcessRead(void *threadid) {
+	ThreadData3 *td = (ThreadData3 *) threadid;
+	int j = td->start;
+	for(int i = td->start; i < td->stop; i++) {
+		//string read = reads[i];
+		//outer << i << endl;
+		processRead(td->sizes, td->sites, (*(td->reads))[i], *(td->results), *(td->whole_genome),  td->thread_id, i);
+	}
+}
+
 
 int main(int argc, char *argv[]) {
 	bool read = true;
@@ -1914,11 +1957,44 @@ int main(int argc, char *argv[]) {
 
 	cout << "NUMBER OF READS: "<< reads.size() << "\n";
 
+	pthread_t threads[4];
+	int rc;
+	pthread_attr_t attr;
+	void *status;
+	pthread_attr_init(&attr);
+	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
+
+	//vector<Result> results;
 	vector<Result> results;
+
+	ThreadData3 datas3[4];
+	int difference = reads.size() / 4;
+
+	for(int i = 0; i < 4; i++) {
+		int start =  i*difference;
+		int stop =  i*difference + difference;
+		datas3[i] = ThreadData3(i, sizes, sites, &reads, start, stop, &whole_genome, &results);
+	}
+	datas3[3].stop = reads.size();
+	for(int i = 0; i < 4; i++) {
+		rc = pthread_create(&threads[i], NULL, preProcessRead, (void *) &datas3[i]);
+	}
+
+	pthread_attr_destroy(&attr);
+	for(int i=0; i < 4; i++ ){
+		rc = pthread_join(threads[i], &status);
+		if (rc){
+			cout << "Error:unable to join," << rc << endl;
+			exit(-1);
+		}
+		cout << "Main: completed thread id :" << i ;
+		cout << "  exiting with status :" << status << endl;
+	}
+/*
 	for(unsigned int i = 0; i < reads.size(); i++) {
 		//cout << (i+1) << "------------------- \n";
 		processRead(sizes, sites, reads[i], results, whole_genome);
-	}
+	}*/
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
 	long endday2 = t2.tv_usec;

@@ -1,5 +1,4 @@
 
-
 struct Triplet {
 	int column;
 	int row;
@@ -16,13 +15,22 @@ struct Triplet {
 	}
 };
 
-bool isNull(Triplet &t);
-
-
-void initHeap(int max_size);
-void add(Triplet &t);
-Triplet peek();
-Triplet poll();
-bool isEmpty();
-void clear();
-int size();
+class Heap {
+	int size_;
+	int CAPACITY;
+	vector<Triplet> array;
+public:
+	Heap();
+	bool isNull(Triplet &t);
+	void initHeap(int max_size);
+	void add(Triplet &t);
+	Triplet peek();
+	Triplet poll();
+	bool isEmpty();
+	void clear();
+	int size();
+private:
+	int compare(Triplet &t1, Triplet &t2);
+	void percDown(int loc);
+	void percUp(int loc);
+};
