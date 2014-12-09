@@ -26,6 +26,8 @@ static string constant_array_scores = "constScoreArrays.txt";
 
 static string results_file = "results.txt";
 
+static string evaluation_file = "eval.txt";
+
 /*
 static string genome_file_name = "ref.fa";
 static string sizes_file_name = "sizes2.txt";
