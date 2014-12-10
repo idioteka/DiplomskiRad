@@ -10,9 +10,15 @@ struct Statistic {
 	int gapped_with_start;
 	int gapped_with_stop;
 	int gapped_with_start_and_stop;
+	int gapped_with_precise_start;
+	int gapped_with_precise_stop;
+	int gapped_with_precise_start_and_stop;
 	int ungapped_with_start;
 	int ungapped_with_stop;
 	int ungapped_with_start_and_stop;
+	int ungapped_with_precise_start;
+	int ungapped_with_precise_stop;
+	int ungapped_with_precise_start_and_stop;
 	int exons;
 	int correct_exons;
 	int same_numbered_exons;
@@ -20,6 +26,11 @@ struct Statistic {
 	int correct_exon_stop;
 	int correct_exon_start_and_stop;
 	int percentage;
+	int precise_percentage;
+	int gapped_percentage;
+	int gapped_precise_percentage;
+	int ungapped_percentage;
+	int ungapped_precise_percentage;
 	Statistic(int num_reads) {
 		reads = num_reads;
 		reads_with_result = 0;
@@ -28,9 +39,15 @@ struct Statistic {
 		gapped_with_start = 0;
 		gapped_with_stop = 0;
 		gapped_with_start_and_stop = 0;
+		gapped_with_precise_start = 0;
+		gapped_with_precise_stop = 0;
+		gapped_with_precise_start_and_stop = 0;
 		ungapped_with_start = 0;
 		ungapped_with_stop = 0;
 		ungapped_with_start_and_stop = 0;
+		ungapped_with_precise_start = 0;
+		ungapped_with_precise_stop = 0;
+		ungapped_with_precise_start_and_stop = 0;
 		exons = 0;
 		correct_exons = 0;
 		same_numbered_exons = 0;
@@ -38,6 +55,11 @@ struct Statistic {
 		correct_exon_stop = 0;
 		correct_exon_start_and_stop = 0;
 		percentage = 0;
+		precise_percentage = 0;
+		gapped_percentage = 0;
+		gapped_precise_percentage = 0;
+		ungapped_percentage = 0;
+		ungapped_precise_percentage = 0;
 	}
 };
 
@@ -47,6 +69,8 @@ struct Result {
 	int stop;
 	string matchString;
 	vector<int> gapArray;
+	int precise_start;
+	int precise_stop;
 	Result(int br_, int start_, int stop_) {
 		br = br_;
 		start = start_;
@@ -145,13 +169,14 @@ void readReads(vector<string> &reads, map<int, Result> &results, string infile) 
 	string line5;
 	string line6;
 
+	int br = 1;
 	while(getline(ifs, line)) {
 		getline(ifs, line2);
 		getline(ifs, line3);
 		getline(ifs, line4);
 		getline(ifs, line5);
 		getline(ifs, line6);
-		int br = atoi(line.c_str());
+		//int br = atoi(line.c_str());
 		Result r = Result(br, atoi(line2.c_str()), atoi(line3.c_str()));
 		r.matchString = line4;
 		gapArrayFromString(r.gapArray, line5);
@@ -159,6 +184,7 @@ void readReads(vector<string> &reads, map<int, Result> &results, string infile) 
 		std::map<int,Result>::iterator it = results.begin();
 		results.insert(it, pair<int,Result>(br, r));
 		reads.push_back(line6);
+		br++;
 	}
 }
 
@@ -956,6 +982,8 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 		vector<int> values;
 
 		vector<int> temp;
+		//cout << "findMaxQscore2" << endl;
+
 		findMaxQscore2(starts, stops, offsets, triples, values, keys, minHitsToScore, true,
 				bestqscore>=maxQuickScore_ && allBasesCovered, sizes, sites, temp);
 
@@ -1007,6 +1035,7 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 		vector<int> values;
 
 		vector<int> temp;
+		//cout << "findMaxQscore22" << endl;
 		findMaxQscore2(starts, stops, offsets, triples, values, keys, minHitsToScore, true,
 				bestqscore>=maxQuickScore_ && allBasesCovered, sizes, sites, temp);
 
@@ -1358,10 +1387,14 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 	max[3] = maxScore;
 }
 
-void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int row, int col, int state, string &out, vector<vector<vector<int> > > &packed) {
+void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int row, int col, int state, Result &r, vector<vector<vector<int> > > &packed) {
 
 	int outPos=0;
 	int gaps=0;
+
+	int addon = refEndLoc - col;
+
+	string out;
 
 	//string out;
 
@@ -1463,12 +1496,16 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 
 	reverse(out.begin(),out.end());
 
+	r.precise_start = r.start-MARIC_PADDING + col;
+	r.precise_stop = r.stop+MARIC_PADDING -addon;
+
 	if(gaps==0){
 		/*for(unsigned int j = 0; j < out.size(); j++) {
 			cout << out[j];
 		}
 		cout << "\n";
 */
+		r.matchString = out;
 		return;
 	}
 
@@ -1486,7 +1523,7 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 			}
 		}
 	}
-	out = out3;
+	r.matchString = out3;
 /*
 	for(unsigned int j = 0; j < out3.size(); j++) {
 		cout << out3[j];
@@ -1500,7 +1537,9 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int score, vector<int> &gaps, int max[], Result &r) {
 	string gref;
 	int grefLimit = (refEndLoc - refStartLoc) + 2 * MARIC_PADDING;
+	bool gapped = true;
 	if((int)gaps.size() == 0) {
+		gapped = false;
 		for(int i = refStartLoc-MARIC_PADDING; i < refEndLoc + MARIC_PADDING; i++) {
 			gref.push_back(ref[i]);
 		}
@@ -1520,6 +1559,7 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 			packed[j][i] = new int[columns+1];
 		}
 	}*/
+
 
 	for(int matrix=0; matrix<3; matrix++){
 		vector<int> row;
@@ -1578,8 +1618,9 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 		cout << endl;
 	}*/
 	//cout << endl;
-	traceback(read, gref, 0, grefLimit, max[0], max[1], max[2], r.matchString, packed);
+	traceback(read, gref, 0, grefLimit, max[0], max[1], max[2], r, packed);
 
+	if(r.gapArray.size() == 0) r.precise_stop--;
 /*
 	for(int i = 0; i < rows+1; i++) {
 		for(int j = 0; j < columns+1; j++) {
@@ -1602,9 +1643,14 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, Result &r, string &whole_genome, int threadId) {
 
 	if(ss.perfect) {
-		r.matchString = "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm";
+		//r.matchString = "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm";
 		r.start = ss.start;
 		r.stop = ss.stop;
+		r.precise_start = r.start;
+		r.precise_stop = r.stop;
+		for(int i = 0; i < read.size(); i++) {
+			r.matchString.push_back('m');
+		}
 		return;
 	}
 
@@ -1614,6 +1660,8 @@ void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, 
 	if(score > imperfectScore) {
 		r.start = ss.start;
 		r.stop = ss.stop;
+		r.precise_start = r.start;
+		r.precise_stop = r.stop;
 		r.matchString = match;
 		return;
 	}
@@ -1625,14 +1673,20 @@ void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, 
 void makeMatchString(vector<SiteScore> &results, string &read, string &read_reverse, int *sizes, int *sites, vector<Result> &resultsFinal, string &whole_genome, int threadId, int br) {
 	int max_score = -9999;
 	SiteScore ss;
+
 	for(unsigned int i = 0; i < results.size(); i++) {
 		if(results[i].score > max_score) {
 			max_score = results[i].score;
+			SiteScore ress = results[i];
 			ss = results[i];
 		}
+		/*if(results[i].stop == 144497458) {
+			ss = results[i];
+		}*/
 	}
 	Result r = Result(br, ss.start, ss.stop);
 	r.gapArray = ss.gapArray;
+
 	if(ss.strand == 0) {
 		makeMatchStringForSite(ss, read, sizes, sites, r, whole_genome, threadId);
 	}
@@ -1656,6 +1710,17 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 	vector<int> stops;
 	int get_hits = getHits(keys, MAX_LEN, starts, stops, sizes);
 
+	/*for(unsigned int i = 0; i < starts.size(); i++) {
+		for(unsigned int j = starts[i]; j < stops[i]; j++) {
+			cout << sites[j] << " ";
+		}
+	}
+	cout << endl;*/
+	/*for(unsigned int i = 0; i < stops.size(); i++) {
+		cout << stops[i] << " ";
+	}
+	cout << endl;
+*/
 	bool filter_by_qscore = (get_hits >= 5);
 	int minScore = (int) (MIN_SCORE_MULT * max_score);
 	int minQuickScore = (int)(MIN_QSCORE_MULT * max_quick_score);
@@ -1706,6 +1771,10 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 
 	while(!heap.isEmpty()) {
 		Triplet t = heap.peek();
+		//cout << "left: " << t.site << endl;
+		/*for(unsigned int i = 0; i < heap.array.size(); i++) {
+			cout << heap.array[i].site << endl;
+		}*/
 		int site = t.site;
 		int center_index = t.column;
 		int max_nearby_site = site;
@@ -1816,50 +1885,56 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 					bool shortEnough = (maxStop-minStart < 2 * (int)read.size());
 
 					if(prevSS.start == site2 && prevSS.stop == site3){
-						results[numberOfSites-1].score = betterScore;
-						results[numberOfSites-1].perfect = (prevSS.perfect || perfect1 || perfect2);
+						results[results.size()-1].score = betterScore;
+						results[results.size()-1].perfect = (prevSS.perfect || perfect1 || perfect2);
 						//if(prevSS.perfect){prevSS.semiperfect=true;}
 
 					} else if(shortEnough && prevSS.start == site2){
 						if(perfect2){
 							//do nothing
 						}else if(perfect1){
-							results[numberOfSites-1].stop = site3;
+							results[results.size()-1].stop = site3;
 							if(!prevSS.perfect) { perfects_found++; }
-							results[numberOfSites-1].perfect = true;
-							results[numberOfSites-1].score = betterScore;
+							results[results.size()-1].perfect = true;
+							results[results.size()-1].score = betterScore;
 						}else{
-							results[numberOfSites-1].stop = maxStop;
+							results[results.size()-1].stop = maxStop;
 							// prevSS.setPerfect(bases); TODO add perfect set
 						}
-						results[numberOfSites-1].score = betterScore;
+						results[results.size()-1].score = betterScore;
 					}else if(shortEnough && prevSS.stop == site3){
 						if(perfect2){
 							//do nothing
 						}else if(perfect1){
-							results[numberOfSites-1].start = site2;
+							results[results.size()-1].start = site2;
 							if(!prevSS.perfect) { perfects_found++; }
-							results[numberOfSites-1].perfect = true;
-							results[numberOfSites-1].score = betterScore;
+							results[results.size()-1].perfect = true;
+							results[results.size()-1].score = betterScore;
 						}else{
-							results[numberOfSites-1].start = minStart;
+							results[results.size()-1].start = minStart;
 							//prevSS.setPerfect(bases); TODO add perfect set
 						}
-						results[numberOfSites-1].score = betterScore;
+						results[results.size()-1].score = betterScore;
 					}else if(shortEnough && (maxStop - minStart <= (int) read.size() + MAX_SUBSUMPTION_LENGTH) && !perfect1 && !perfect2){
-						results[numberOfSites-1].start = minStart;
-						results[numberOfSites-1].stop = maxStop;
-						results[numberOfSites-1].score = betterScore;
+						results[results.size()-1].start = minStart;
+						results[results.size()-1].stop = maxStop;
+						results[results.size()-1].score = betterScore;
 						//prevSS.setPerfect(bases); TODO add perfect set
 					}else{
 						ss = SiteScore(site2, site3, score, approx_hits, perfect1, strand, gapArray);
-						//cout << "first: start: " << site2+8000 << ", stop: " << site3+8000 << "\n";
+						//cout << "first: start: " << site2 << ", stop: " << site3 << "\n";
+						//cout << "length: " << (site3 - site2) << endl;
+						//cout << "score: " << score << endl;
+						//cout << "size of results: " << results.size() << endl;
 						//if(!perfect1){ss.setPerfect(bases);} TODO add perfect set
 					}
 
 				}else if(inbounds){
 					ss = SiteScore(site2, site3, score, approx_hits, perfect1, strand, gapArray);
-					//cout << "second: start: " << site2+8000 << ", stop: " << site3+8000 << "\n";
+					//cout << "second: start: " << site2 << ", stop: " << site3 << "\n";
+					//cout << "length: " << (site3 - site2) << endl;
+					//cout << "score: " << score << endl;
+					//cout << "size of results: " << results.size() << endl;
 					//if(!perfect1){ss.setPerfect(bases);} TODO add perfect setter
 				}
 
@@ -1894,6 +1969,10 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 				heap.add(t2);
 			}
 			else if(heap.size() < approx_hits_cutoff){
+				/*cout << "--------------" << endl;
+				for(unsigned int i = 0; i < results.size(); i++) {
+					cout << "start: " << results[i].start << ", stop: " << results[i].stop << endl;
+				}*/
 				return;
 			}
 		}
@@ -1945,10 +2024,14 @@ void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFi
 	vector<int> keys_reversed;
 	reverseComplementKeys(keys_reversed, read_keys_final, KEYLEN);
 
+	//cout << "Read: " << br << " prepared." << endl;
+
 	if(prescan_qscore){
 		vector<vector<int> > prescanResults;
 		prescanAllBlocks(prescanResults, bestScores, read_keys_final, offsets,
 				keys_reversed, offsets_reversed, pretend_all_bases_covered, sizes, sites);
+
+		//cout << "Read: " << br << "prescan all blocks. " << endl;
 
 		precounts=prescanResults[0];
 		prescores=prescanResults[1];
@@ -1977,6 +2060,13 @@ void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFi
 
 	bool fully_defined = isFullyDefined(read);
 
+	//cout << "Read: " << br << " prescaned." << endl;
+
+//	cout << "precounts[0]: " << precounts[0] << endl;
+//	cout << "prescores[0]: " << prescores[0] << endl;
+//	cout << "precounts[1]: " << precounts[1] << endl;
+//	cout << "prescores[1]: " << prescores[1] << endl;
+
 	if(precounts[0] >= hitsCutoff && prescores[0] >= qscoreCutoff) {
 		align(bestScores, read_keys_final, read, offsets, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 0, whole_genome);
 	}
@@ -1984,7 +2074,12 @@ void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFi
 		align(bestScores, keys_reversed, read_reverse, offsets_reversed, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 1, whole_genome);
 	}
 
-
+	//cout << "Read: " << br << " aligned." << endl;
+/*
+	for(unsigned int i = 0; i < results.size(); i++) {
+		cout << "start: " << results[i].start << ", stop: " << results[i].stop << endl;
+	}
+*/
 	makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br);
 
 	return;
@@ -1992,11 +2087,13 @@ void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFi
 
 void writeResults(vector<Result> results, string infile) {
 
+
 	ofstream out_res(infile.c_str());
 	int br = 1;
 	for(unsigned int i = 0; i < results.size(); i++) {
 		Result r = results[i];
 		out_res << r.br << "-" << r.start << "-" << r.stop << "-" << (r.stop-r.start) << endl;
+		out_res << r.precise_start << "-" << r.precise_stop << endl;
 		out_res << r.matchString << endl;
 		br++;
 	}
@@ -2006,18 +2103,46 @@ void writeResults(vector<Result> results, string infile) {
 void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
 	statistics.reads_with_result++;
 	if(r2.gapArray.size() > 2) {
-		for(unsigned int i = 0; i < r1.gapArray.size(); i++) {
+		for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
+			unsigned int start = r2.gapArray[i] - r2.start;
+			unsigned int stop = r2.gapArray[i+1] - r2.start;
+			if(start > r1.matchString.size()) break;
+			if(stop > r1.matchString.size()) stop = r1.matchString.size();
+			for(unsigned int j = start; j <= stop; j++) {
+				if(r1.matchString[j] == 'm') statistics.gapped_percentage++;
+			}
+		}
+		for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
+			unsigned int start = r2.gapArray[i];
+			unsigned int stop = r2.gapArray[i+1];
+			if(r1.precise_start > stop) break;
+			if(r1.precise_stop < start) break;
+			stop = stop - start;
+			if(r1.precise_start <= start) start = start - r1.precise_start;
+			else start = 0;
+			stop = stop - start;
+			if(stop > r1.matchString.size()) break;
+
+			//if(stop > r1.matchString.size()) stop = r1.matchString.size();
+			for(unsigned int j = start; j <= stop; j++) {
+				if(r1.matchString[j] == 'm') statistics.gapped_precise_percentage++;
+			}
+		}
+	/* 	for(unsigned int i = 0; i < r1.gapArray.size(); i++) {
 			cout << r1.gapArray[i] << " ";
 		}
 		cout << endl;
 		for(unsigned int i = 0; i < r2.gapArray.size(); i++) {
 			cout << r2.gapArray[i] << " ";
 		}
-		cout << endl;
+		cout << endl;*/
 		statistics.gapped++;
 		if(r1.start == r2.start) statistics.gapped_with_start++;
 		if(r1.stop == r2.stop) statistics.gapped_with_stop++;
 		if(r1.start == r2.start && r1.stop == r2.stop) statistics.gapped_with_start_and_stop++;
+		if(r1.precise_start == r2.start) statistics.gapped_with_precise_start++;
+		if(r1.precise_stop == r2.stop) statistics.gapped_with_precise_stop++;
+		if(r1.precise_start == r2.start && r1.precise_stop == r2.stop) statistics.gapped_with_precise_start_and_stop++;
 		if(r1.gapArray.size() == r2.gapArray.size()) {
 			for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
 				statistics.exons++;
@@ -2038,16 +2163,59 @@ void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &
 		if(r1.start == r2.start) statistics.ungapped_with_start++;
 		if(r1.stop == r2.stop) statistics.ungapped_with_stop++;
 		if(r1.start == r2.start && r1.stop == r2.stop) statistics.ungapped_with_start_and_stop++;
+		if(r1.precise_start == r2.start) statistics.ungapped_with_precise_start++;
+		if(r1.precise_stop == r2.stop) statistics.ungapped_with_precise_stop++;
+		if(r1.precise_start == r2.start && r1.precise_stop == r2.stop) statistics.ungapped_with_precise_start_and_stop++;
+		for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
+			unsigned int start = r2.gapArray[i] - r2.start;
+			unsigned int stop = r2.gapArray[i+1] - r2.start;
+			if(start > r1.matchString.size()) break;
+			if(stop > r1.matchString.size()) stop = r1.matchString.size();
+			for(unsigned int j = start; j <= stop; j++) {
+				if(r1.matchString[j] == 'm') statistics.ungapped_percentage++;
+			}
+		}
+		for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
+			unsigned int start = r2.gapArray[i];
+			unsigned int stop = r2.gapArray[i+1];
+			if(r1.precise_start > stop) break;
+			if(r1.precise_stop < start) break;
+			stop = stop - start;
+			if(r1.precise_start <= start) start = start - r1.precise_start;
+			else start = 0;
+			stop = stop - start;
+			if(stop > r1.matchString.size()) break;
 
+			//if(stop > r1.matchString.size()) stop = r1.matchString.size();
+			for(unsigned int j = start; j <= stop; j++) {
+				if(r1.matchString[j] == 'm') statistics.ungapped_precise_percentage++;
+			}
+		}
 	}
 
 	for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-		int start = r2.gapArray[i] - r2.start;
-		int stop = r2.gapArray[i+1] - r2.start;
+		unsigned int start = r2.gapArray[i] - r2.start;
+		unsigned int stop = r2.gapArray[i+1] - r2.start;
 		if(start > r1.matchString.size()) break;
 		if(stop > r1.matchString.size()) stop = r1.matchString.size();
-		for(int j = start; j < stop; j++) {
+		for(unsigned int j = start; j <= stop; j++) {
 			if(r1.matchString[j] == 'm') statistics.percentage++;
+		}
+	}
+	for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
+		unsigned int start = r2.gapArray[i];
+		unsigned int stop = r2.gapArray[i+1];
+		if(r1.precise_start > stop) break;
+		if(r1.precise_stop < start) break;
+		stop = stop - start;
+		if(r1.precise_start <= start) start = start - r1.precise_start;
+		else start = 0;
+		stop = stop - start;
+		if(stop > r1.matchString.size()) break;
+
+		//if(stop > r1.matchString.size()) stop = r1.matchString.size();
+		for(unsigned int j = start; j <= stop; j++) {
+			if(r1.matchString[j] == 'm') statistics.precise_percentage++;
 		}
 	}
 
@@ -2064,6 +2232,12 @@ void writeStatistics(vector<Result> &results, map<int, Result> &correct_results,
 		calculateStatistics(r1, r2, out_stat, statistic);
 	}
 	double percentage = statistic.percentage / (double) statistic.reads_with_result;
+	double precise_percentage = statistic.precise_percentage / (double) statistic.reads_with_result;
+	double gapped_percentage = statistic.gapped_percentage / (double) statistic.gapped;
+	double gapped_precise_percentage = statistic.gapped_precise_percentage / (double) statistic.gapped;
+	double ungapped_percentage = statistic.ungapped_percentage / (double) statistic.ungapped;
+	double ungapped_precise_percentage = statistic.ungapped_precise_percentage / (double) statistic.ungapped;
+
 	out_stat << "reads: " << statistic.reads << endl;
 	out_stat << "reads_with_result: " << statistic.reads_with_result << endl;
 	out_stat << "gapped: " << statistic.gapped << endl;
@@ -2071,9 +2245,15 @@ void writeStatistics(vector<Result> &results, map<int, Result> &correct_results,
 	out_stat << "gapped_with_start: " << statistic.gapped_with_start << endl;
 	out_stat << "gapped_with_stop: " << statistic.gapped_with_stop << endl;
 	out_stat << "gapped_with_start_and_stop: " << statistic.gapped_with_start_and_stop << endl;
+	out_stat << "gapped_with_precise_start: " << statistic.gapped_with_precise_start << endl;
+	out_stat << "gapped_with_precise_stop: " << statistic.gapped_with_precise_stop << endl;
+	out_stat << "gapped_with_precise_start_and_stop: " << statistic.gapped_with_precise_start_and_stop << endl;
 	out_stat << "ungapped_with_start: " << statistic.ungapped_with_start << endl;
 	out_stat << "ungapped_with_stop: " << statistic.ungapped_with_stop << endl;
 	out_stat << "ungapped_with_start_and_stop: " << statistic.ungapped_with_start_and_stop << endl;
+	out_stat << "ungapped_with_precise_start: " << statistic.ungapped_with_precise_start << endl;
+	out_stat << "ungapped_with_precise_stop: " << statistic.ungapped_with_precise_stop << endl;
+	out_stat << "ungapped_with_precise_start_and_stop: " << statistic.ungapped_with_precise_start_and_stop << endl;
 	out_stat << "exons: " << statistic.exons << endl;
 	out_stat << "correct_exons: " << statistic.correct_exons << endl;
 	out_stat << "same_numbered_exons: " << statistic.same_numbered_exons << endl;
@@ -2082,6 +2262,16 @@ void writeStatistics(vector<Result> &results, map<int, Result> &correct_results,
 	out_stat << "correct_exon_start_and_stop: " << statistic.correct_exon_start_and_stop << endl;
 	out_stat << "correct_bases: " << statistic.percentage << endl;
 	out_stat << "percentage: " << percentage << endl;
+	out_stat << "precise_correct_bases: " << statistic.precise_percentage << endl;
+	out_stat << "precise_percentage: " << precise_percentage << endl;
+	out_stat << "ungapped_correct_bases: " << statistic.ungapped_percentage << endl;
+	out_stat << "ungapped_percentage: " << ungapped_percentage << endl;
+	out_stat << "ungapped_precise_correct_bases: " << statistic.ungapped_precise_percentage << endl;
+	out_stat << "ungapped_precise_percentage: " << ungapped_precise_percentage << endl;
+	out_stat << "gapped_correct_bases: " << statistic.gapped_percentage << endl;
+	out_stat << "gapped_percentage: " << gapped_percentage << endl;
+	out_stat << "gapped_precise_correct_bases: " << statistic.gapped_precise_percentage << endl;
+	out_stat << "gapped_precise_percentage: " << gapped_precise_percentage << endl;
 	out_stat.close();
 
 }
@@ -2090,7 +2280,7 @@ void writeStatistics(vector<Result> &results, map<int, Result> &correct_results,
 void *preProcessRead(void *threadid) {
 	ThreadData3 *td = (ThreadData3 *) threadid;
 	for(int i = td->start; i < td->stop; i++) {
-		//cout << "i: " << i << endl;
+		cout << "Read: " << i+1 << " started." << endl;
 		processRead(td->sizes, td->sites, (*(td->reads))[i], *(td->results), *(td->whole_genome),  td->thread_id, i+1);
 	}
 	pthread_exit(NULL);
@@ -2101,6 +2291,8 @@ int main(int argc, char *argv[]) {
 	bool read = true;
 	string whole_genome;
 
+	cout << "START" << endl;
+
 	int **res;
 	if(read) {
 		res = readIndex(whole_genome);
@@ -2108,6 +2300,8 @@ int main(int argc, char *argv[]) {
 	else {
 		res = createIndex(false, whole_genome);
 	}
+
+	cout << "genome size: " << whole_genome.size() << endl;
 
 	int *sizes = res[1];
 	int *sites = res[3];
@@ -2147,6 +2341,7 @@ int main(int argc, char *argv[]) {
 	}
 	datas3[3].stop = reads.size();
 	for(int i = 0; i < 4; i++) {
+		cout << "THREAD " << i << " STARTED" << endl;
 		rc = pthread_create(&threads[i], NULL, preProcessRead, (void *) &datas3[i]);
 	}
 

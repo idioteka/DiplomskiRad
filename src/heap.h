@@ -18,8 +18,8 @@ struct Triplet {
 class Heap {
 	int size_;
 	int CAPACITY;
-	vector<Triplet> array;
 public:
+	vector<Triplet> array;
 	Heap();
 	bool isNull(Triplet &t);
 	void initHeap(int max_size);
