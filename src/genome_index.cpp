@@ -190,7 +190,7 @@ void writeSizes(int *sizes) {
 	fwrite(sizes, sizeof(int), keyspace, pFile);
 	fclose(pFile);
 }
-
+/*
 void writeSizes2(int *sizes) {
 	ofstream sizes_output_stream(sizes_file_name.c_str());
 	sizes_output_stream << keyspace;
@@ -200,14 +200,14 @@ void writeSizes2(int *sizes) {
 		sizes_output_stream << "\n";
 	}
 }
-
+*/
 void writeSites(int *sites, int sum) {
 	FILE* pFile;
 	pFile = fopen("sites", "wb");
 	fwrite(sites, sizeof(int), sum, pFile);
 	fclose(pFile);
 }
-
+/*
 void writeSites2(int *sites, int sum) {
 	ofstream sizes_output_stream(sites_file_name.c_str());
 	sizes_output_stream << sum;
@@ -217,7 +217,7 @@ void writeSites2(int *sites, int sum) {
 		sizes_output_stream << "\n";
 	}
 }
-
+*/
 int *readArray(string filename, bool write_sum) {
 	FILE * pFile;
 	long lSize;
@@ -235,6 +235,8 @@ int *readArray(string filename, bool write_sum) {
 
 	// allocate memory to contain the whole file:
 	buffer = (int*) malloc (sizeof(char)*lSize);
+
+	cout << "size: " << lSize << endl;
 
 	// copy the file into the buffer:
 	fread (buffer,1,lSize,pFile);
@@ -259,7 +261,7 @@ int *readArray2(string filename, bool write_sum) {
 
 int ** readIndex(string &whole_genome) {
 
-	extractGenomeFromFile(genome_file_name, whole_genome);
+	extractGenomeFromFile("chr1.fa", whole_genome);
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
@@ -304,7 +306,7 @@ int ** readIndex(string &whole_genome) {
 
 int ** createIndex(bool write_to_file, string &whole_genome) {
 
-	extractGenomeFromFile(genome_file_name, whole_genome);
+	extractGenomeFromFile("chr1.fa", whole_genome);
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);

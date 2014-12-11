@@ -22,11 +22,6 @@ using namespace std;
 
 //static string whole_genome;
 
-static string constant_array_scores = "constScoreArrays.txt";
-
-static string results_file = "results.txt";
-
-static string evaluation_file = "eval.txt";
 
 /*
 static string genome_file_name = "ref.fa";
@@ -37,11 +32,6 @@ static string reads_file_name = "test.fasta";
 
 static int length_of_sites;
 static int length_of_sizes;
-
-static string genome_file_name = "chr1.fa";
-static string sizes_file_name = "sizes.txt";
-static string sites_file_name = "sites.txt";
-static string reads_file_name = "test2R.fa";
 
 static int maxDesiredKeys = 15;
 static int minKeysDesired = 2;

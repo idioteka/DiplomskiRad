@@ -2085,9 +2085,29 @@ void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFi
 	return;
 }
 
-void writeResults(vector<Result> results, string infile) {
+void sortResults(vector<Result> &results) {
+	for(unsigned int i = 0; i < results.size()-1; i++) {
+		int min = i;
+		for(unsigned int j = i+1; j < results.size(); j++) {
+			if(results[j].br < results[min].br) min = j;
+		}
+		if(min != i) {
+			Result r = results[i];
+			results[i] = results[min];
+			results[min] = r;
+		}
+	}
+}
 
+void writeResults(vector<vector<Result> > &set_of_results, string infile) {
 
+	vector<Result> results;
+	for(unsigned int i = 0; i < set_of_results.size(); i++) {
+		for(unsigned int j = 0; j < set_of_results[i].size(); j++) {
+			results.push_back(set_of_results[i][j]);
+		}
+	}
+	sortResults(results);
 	ofstream out_res(infile.c_str());
 	int br = 1;
 	for(unsigned int i = 0; i < results.size(); i++) {
@@ -2097,7 +2117,26 @@ void writeResults(vector<Result> results, string infile) {
 		out_res << r.matchString << endl;
 		br++;
 	}
+
 	out_res.close();
+}
+
+int calculateGappedPrecisePercentage(int precise_start, int start1, int stop1, int start2, int stop2, string &matchString) {
+	int number = 0;
+
+	int start = start2;
+	if(start2 < start1) start = start1;
+	int stop = stop2;
+	if(stop2 > stop1) stop = stop1;
+
+	start = start - precise_start;
+	stop = stop - precise_start;
+
+	for(unsigned int j = start; j <= stop; j++) {
+		if(matchString[j] == 'm') number++;
+	}
+
+	return number;
 }
 
 void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
@@ -2112,22 +2151,32 @@ void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &
 				if(r1.matchString[j] == 'm') statistics.gapped_percentage++;
 			}
 		}
+
+		for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
+			for(unsigned int j = 0; j < r1.gapArray.size(); j+=2) {
+				if(overlap(r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1])) {
+					statistics.gapped_precise_percentage += calculateGappedPrecisePercentage(r1.precise_start, r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1], r1.matchString);
+				}
+			}
+		}
+
+		/*
 		for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
 			unsigned int start = r2.gapArray[i];
 			unsigned int stop = r2.gapArray[i+1];
 			if(r1.precise_start > stop) break;
 			if(r1.precise_stop < start) break;
-			stop = stop - start;
+			stop = stop - first_start;
 			if(r1.precise_start <= start) start = start - r1.precise_start;
 			else start = 0;
-			stop = stop - start;
+			//stop = stop - start;
 			if(stop > r1.matchString.size()) break;
 
 			//if(stop > r1.matchString.size()) stop = r1.matchString.size();
 			for(unsigned int j = start; j <= stop; j++) {
 				if(r1.matchString[j] == 'm') statistics.gapped_precise_percentage++;
 			}
-		}
+		}*/
 	/* 	for(unsigned int i = 0; i < r1.gapArray.size(); i++) {
 			cout << r1.gapArray[i] << " ";
 		}
@@ -2175,7 +2224,10 @@ void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &
 				if(r1.matchString[j] == 'm') statistics.ungapped_percentage++;
 			}
 		}
-		for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
+		if(overlap(r2.gapArray[0], r2.gapArray[1], r1.precise_start, r1.precise_stop)) {
+			statistics.ungapped_precise_percentage += calculateGappedPrecisePercentage(r1.precise_start, r2.gapArray[0], r2.gapArray[0+1], r1.precise_start, r1.precise_stop, r1.matchString);
+		}
+		/*for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
 			unsigned int start = r2.gapArray[i];
 			unsigned int stop = r2.gapArray[i+1];
 			if(r1.precise_start > stop) break;
@@ -2190,9 +2242,12 @@ void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &
 			for(unsigned int j = start; j <= stop; j++) {
 				if(r1.matchString[j] == 'm') statistics.ungapped_precise_percentage++;
 			}
-		}
+		}*/
 	}
+	statistics.percentage = statistics.gapped_percentage + statistics.ungapped_percentage;
+	statistics.precise_percentage = statistics.gapped_precise_percentage + statistics.ungapped_precise_percentage;
 
+/*
 	for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
 		unsigned int start = r2.gapArray[i] - r2.start;
 		unsigned int stop = r2.gapArray[i+1] - r2.start;
@@ -2218,19 +2273,23 @@ void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &
 			if(r1.matchString[j] == 'm') statistics.precise_percentage++;
 		}
 	}
-
+*/
 }
 
-void writeStatistics(vector<Result> &results, map<int, Result> &correct_results, string infile, Statistic &statistic) {
+void writeStatistics(vector<vector<Result> > &set_of_results, map<int, Result> &correct_results, string infile, Statistic &statistic) {
 	ofstream out_stat(infile.c_str());
 	//Statistic statistic = Statistic();
 	//cout << "number: " << results.size();
-	for(unsigned int i = 0; i < results.size(); i++) {
-		Result r1 = results[i];
-		map<int, Result>::iterator pos = correct_results.find(r1.br);
-		Result r2 = pos->second;
-		calculateStatistics(r1, r2, out_stat, statistic);
+	for(unsigned int j = 0; j < set_of_results.size(); j++) {
+		vector<Result> results = set_of_results[j];
+		for(unsigned int i = 0; i < results.size(); i++) {
+			Result r1 = results[i];
+			map<int, Result>::iterator pos = correct_results.find(r1.br);
+			Result r2 = pos->second;
+			calculateStatistics(r1, r2, out_stat, statistic);
+		}
 	}
+
 	double percentage = statistic.percentage / (double) statistic.reads_with_result;
 	double precise_percentage = statistic.precise_percentage / (double) statistic.reads_with_result;
 	double gapped_percentage = statistic.gapped_percentage / (double) statistic.gapped;
@@ -2272,6 +2331,7 @@ void writeStatistics(vector<Result> &results, map<int, Result> &correct_results,
 	out_stat << "gapped_percentage: " << gapped_percentage << endl;
 	out_stat << "gapped_precise_correct_bases: " << statistic.gapped_precise_percentage << endl;
 	out_stat << "gapped_precise_percentage: " << gapped_precise_percentage << endl;
+
 	out_stat.close();
 
 }
@@ -2280,7 +2340,8 @@ void writeStatistics(vector<Result> &results, map<int, Result> &correct_results,
 void *preProcessRead(void *threadid) {
 	ThreadData3 *td = (ThreadData3 *) threadid;
 	for(int i = td->start; i < td->stop; i++) {
-		cout << "Read: " << i+1 << " started." << endl;
+
+		if((i+1)%10 == 0) cout << "Read: " << i+1 << " started." << endl;
 		processRead(td->sizes, td->sites, (*(td->reads))[i], *(td->results), *(td->whole_genome),  td->thread_id, i+1);
 	}
 	pthread_exit(NULL);
@@ -2329,15 +2390,18 @@ int main(int argc, char *argv[]) {
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
 	//vector<Result> results;
-	vector<Result> results;
-
+	vector<vector<Result> > set_of_results;
+	for(int i = 0; i < 4; i++) {
+		vector<Result> tmp;
+		set_of_results.push_back(tmp);
+	}
 	ThreadData3 datas3[4];
 	int difference = reads.size() / 4;
 
 	for(int i = 0; i < 4; i++) {
 		int start =  i*difference;
 		int stop =  i*difference + difference;
-		datas3[i] = ThreadData3(i, sizes, sites, &reads, start, stop, &whole_genome, &results);
+		datas3[i] = ThreadData3(i, sizes, sites, &reads, start, stop, &whole_genome, &set_of_results[i]);
 	}
 	datas3[3].stop = reads.size();
 	for(int i = 0; i < 4; i++) {
@@ -2367,10 +2431,10 @@ int main(int argc, char *argv[]) {
 	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "ALIGNED READS: " << timefinal << endl;
 
-	writeResults(results, argv[2]);
+	writeResults(set_of_results, argv[2]);
 	cout << "RESULTS WRITTEN" << endl;
 	Statistic s = Statistic(reads.size());
-	writeStatistics(results, correct_results, argv[3], s);
+	writeStatistics(set_of_results, correct_results, argv[3], s);
 	cout << "STATISTICS WRITTEN" << endl;
 
 
