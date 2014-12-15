@@ -236,7 +236,7 @@ int *readArray(string filename, bool write_sum) {
 	// allocate memory to contain the whole file:
 	buffer = (int*) malloc (sizeof(char)*lSize);
 
-	cout << "size: " << lSize << endl;
+	//cout << "Sizes size: " << lSize << endl;
 
 	// copy the file into the buffer:
 	fread (buffer,1,lSize,pFile);
@@ -246,7 +246,7 @@ int *readArray(string filename, bool write_sum) {
 	fclose (pFile);
 	return buffer;
 }
-
+/*
 int *readArray2(string filename, bool write_sum) {
 	ifstream ifs(filename.c_str());
 	int size;
@@ -258,23 +258,32 @@ int *readArray2(string filename, bool write_sum) {
 	}
 	return array;
 }
-
-int ** readIndex(string &whole_genome) {
-
-	extractGenomeFromFile("chr1.fa", whole_genome);
+*/
+int ** readIndex(string &whole_genome, string genome_ref) {
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
 	long startday = t1.tv_sec;
 	long startday2 = t1.tv_usec;
-
-	int *sizes = readArray("sizes", false);
-
+	extractGenomeFromFile(genome_ref, whole_genome);
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
 	long endday2 = t2.tv_usec;
 	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-	cout << "READ SIZES: " << timefinal << endl;
+	cout << "Genome read: " << timefinal << " seconds." << endl;
+
+	t1, t2;
+	gettimeofday(&t1, NULL);
+	startday = t1.tv_sec;
+	startday2 = t1.tv_usec;
+
+	int *sizes = readArray("sizes", false);
+
+	gettimeofday(&t2, NULL);
+	endday = t2.tv_sec;
+	endday2 = t2.tv_usec;
+	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	cout << "Sizes loaded: " << timefinal << " seconds." << endl;
 
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
@@ -285,7 +294,7 @@ int ** readIndex(string &whole_genome) {
 	endday2 = t2.tv_usec;
 
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-	cout << "READ SITES: " << timefinal << endl;
+	cout << "Sites loaded: " << timefinal << " seconds." << endl;
 
 	//length_of_sizes = keyspace;
 	//length_of_sites = key_num;
@@ -304,9 +313,9 @@ int ** readIndex(string &whole_genome) {
 	return result;
 }
 
-int ** createIndex(bool write_to_file, string &whole_genome) {
+int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref) {
 
-	extractGenomeFromFile("chr1.fa", whole_genome);
+	extractGenomeFromFile(genome_ref, whole_genome);
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
