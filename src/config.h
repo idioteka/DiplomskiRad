@@ -17,8 +17,14 @@
 #include <cstdlib>
 #include <pthread.h>
 #include <sys/time.h>
+#include <sys/stat.h>
 
 using namespace std;
+
+static string outdir;
+static string index_location;
+static bool overwrite_index = false;
+static int thread_num = 4;
 
 static int length_of_sites;
 static int length_of_sizes;

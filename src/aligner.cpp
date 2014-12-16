@@ -162,6 +162,10 @@ void gapArrayFromString(vector<int> &gapArray, string str) {
 
 void readReads(vector<string> &reads, map<int, Result> &results, string infile) {
 	ifstream ifs(infile.c_str());
+	if(!ifs) {
+		cout << "File " << infile << " does not exist." << endl;
+		exit(-1);
+	}
 	string line;
 	string line2;
 	string line3;
@@ -2303,28 +2307,134 @@ void *preProcessRead(void *threadid) {
 	pthread_exit(NULL);
 }
 
+void checkParameter(string command, string value) {
+	if(strcmp(command.c_str(), "-t") == 0) {
+			thread_num = atoi(value.c_str());
+			cout << "Number of threads se to " << thread_num << "." << endl;
+		}
+		else if(strcmp(command.c_str(), "-i") == 0) {
+			index_location = value;
+			cout << "Index location set to '" << index_location << "'." << endl;
+		}
+		else if(strcmp(command.c_str(), "-c") == 0) {
+			overwrite_index = true;
+			cout << "Index will be created. If index was previously created at ";
+			cout << "set location it will be overwriten." << endl;
+		}
+		else {
+			cout << "Parameter " << command << " not recognized." << endl;
+			exit(-1);
+		}
+}
 
 int main(int argc, char *argv[]) {
 
-	if(argc != 7) {
-		cout << "Program must run with arguments: <reads_file> <results_file> <statistics_file> <thread_number> <genome_reference_file> <create_index>" << endl;
+	if(argc != 4 && argc != 6 && argc != 8 && argc != 10) {
+		cout << "Program must run with arguments: <destination_folder> <reads_file> <genome_reference_file> -t <thread_number> -i <index_location> -c <create_index>" << endl;
+		cout << "<destination_folder> - folder where results will be stored." << endl;
+		cout << "<reads_file> - file with reads in fasta format." << endl;
+		cout << "<genome_reference_file> - file with regerence genome." << endl;
+		//cout << "<create_index> - 0 if index was created before, 1 if you want to create an index for this run." << endl;
+		//cout << "<reults_file> - file where resulting alignments will be stored." << endl;
+		//cout << "<statistics_file> - file where statistics will be stored." << endl;
+		cout << "-t <thread_number> - Optional parameter. Number of threads, default 4." << endl;
+		cout << "-i <index_location> - Optional parameter. Location of created index if index exists at <index_location>. If index does not exist, program creates index at <index_location>. " << endl;
+		cout << "By default program looks for index in the <destination_folder> location. If there is no index, by default program creates new index in <destination_folder>" << endl;
+		cout << "If you wish to create index even if it exists use -c <create_index> option." << endl;
+		cout << "-o <create_index> use 1 if you wish to create index even if index exist at given location. This will overwrite previously created index at given location." << endl;
+		cout << "" << endl;
 		return -1;
+	}
+	struct stat sb;
+	cout << "Program started: " << endl;
+
+	if (stat(argv[1], &sb) == 0 && S_ISDIR(sb.st_mode)) {
+		outdir = argv[1];
+		cout << "Results will be stored in '" << outdir << "'." << endl;
+		//exit(0);
+	}
+	else {
+		outdir = argv[1];
+		const string out = "mkdir -p " + outdir;
+		//cout << out << endl;
+		if(system(out.c_str())) {
+			cout << "Unable to create directory '" << outdir << "'." << endl;
+			exit(-1);
+		}
+		else {
+			cout << "Directory '" << outdir << "' created." << endl;
+			cout << "Results will be stored in '" << outdir << "'." << endl;
+		//	exit(0);
+		}
+	}
+
+	index_location = outdir;
+
+	if(argc == 6) {
+		checkParameter(argv[4], argv[5]);
+	}
+	if(argc == 8) {
+		checkParameter(argv[4], argv[5]);
+		checkParameter(argv[6], argv[7]);
+	}
+	if(argc == 10) {
+		checkParameter(argv[4], argv[5]);
+		checkParameter(argv[6], argv[7]);
+		checkParameter(argv[8], argv[9]);
 	}
 
 	bool read_index = true;
-	string genome_ref = argv[5];
-	if(atoi(argv[6]) == 1) read_index = false;
-	int thread_num = atoi(argv[4]);
-
+	string genome_ref = argv[3];
 	string whole_genome;
-	cout << "Program started: " << endl;
+
+	if (stat(index_location.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode)) {
+		FILE *pFile;
+		FILE *pFile2;
+		string sizes_location = index_location + "//sizes";
+		string sites_location = index_location + "//sites";
+		pFile = fopen( sizes_location.c_str() , "rb" );
+		pFile2 = fopen(sites_location.c_str(), "rb");
+
+		if(!pFile || !pFile2) {
+			cout << "Index does not exist at location '" << index_location << "'." << endl;
+			cout << "Index will be created at location '" << index_location << "'." << endl;
+			read_index = false;
+		}
+		if(pFile) {
+			fclose(pFile);
+		}
+		if(pFile2) {
+			fclose(pFile2);
+		}
+	}
+	else {
+		cout << "Directory '" << index_location << "' does not exist." << endl;
+		read_index = false;
+		const string out = "mkdir -p " + index_location;
+		//cout << out << endl;
+		if(system(out.c_str())) {
+			cout << "Unable to create directory '" << index_location << "'." << endl;
+			exit(-1);
+		}
+		else {
+			cout << "Directory '" << index_location << "' created." << endl;
+			cout << "Index will be stored in '" << index_location << "'." << endl;
+		//	exit(0);
+		}
+	}
+
+	if(overwrite_index) {
+		read_index = false;
+	}
 
 	int **res;
 	if(read_index) {
-		res = readIndex(whole_genome, genome_ref);
+		cout << "Reading index..." << endl;
+		res = readIndex(whole_genome, genome_ref, index_location);
 	}
 	else {
-		res = createIndex(false, whole_genome, genome_ref);
+		cout << "Creating index..." << endl;
+		res = createIndex(true, whole_genome, genome_ref, index_location);
 	}
 
 	cout << "genome size: " << whole_genome.size() << endl;
@@ -2337,7 +2447,7 @@ int main(int argc, char *argv[]) {
 
 	vector<string> reads;
 	map<int, Result> correct_results;
-	readReads(reads, correct_results, argv[1]);
+	readReads(reads, correct_results, argv[2]);
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
@@ -2398,7 +2508,7 @@ int main(int argc, char *argv[]) {
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	writeResults(set_of_results, argv[2]);
+	writeResults(set_of_results, outdir + "//" + "results.txt");
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
@@ -2409,7 +2519,7 @@ int main(int argc, char *argv[]) {
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
 	Statistic s = Statistic(reads.size());
-	writeStatistics(set_of_results, correct_results, argv[3], s);
+	writeStatistics(set_of_results, correct_results, outdir + "//" + "statistics.txt", s);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
@@ -2434,3 +2544,4 @@ int main(int argc, char *argv[]) {
 
 	return 0;
 }
+

@@ -36,6 +36,10 @@ void extractGenomeFromFile(string genome_file, string &whole_genome) {
 
 	//whole_genome = "";
 	FILE *inGenome = fopen(genome_file.c_str(), "r");
+	if (inGenome == NULL) {
+		cout << "Reference file does not exist: " << genome_file << endl;
+		exit(-1);
+	}
 	char buff[256];
 
 	while (fgets(buff, 255, inGenome)) {
@@ -79,11 +83,8 @@ int getKeyFromKmer(string &whole_genome, int start, int stop) {
 
 
 void *countKeys(void *threadid) {
-	clock_t sat = clock();
 	ThreadData *td = (ThreadData *) threadid;
 
-	//int *sizes = (*td).array;
-	//cout << "threadid: " << td->thread_id << "\n";
 	int start = 0;
 	int sum = 0;
 
@@ -106,39 +107,11 @@ void *countKeys(void *threadid) {
 
 	pthread_exit(NULL);
 }
-/*
-int *countKeys(string &whole_genome) {
-	int *sizes = new int[keyspace] {0};
-	int start = 0;
-	int sum = 0;
-
-	while(getCodeFromBase(whole_genome[start]) < 0) {
-		start++;
-	}
-
-	for(unsigned int i = start; i < whole_genome.size()-(KEYLEN-1); i++) {
-
-		int code = getCodeFromBase(whole_genome[i]);
-		if(code >= 0) {
-			int key = getKeyFromKmer(whole_genome, i, i+KEYLEN);
-			if(key >= 0) {
-				sizes[key]++;
-				sum++;
-			}
-		}
-	}
-
-	return sizes;
-}
-*/
 
 
 void *fillArrays(void *threadid) {
 	ThreadData2 *td = (ThreadData2 *) threadid;
 	int start = 0;
-	//cout << "fill threadid: " << td->thread_id << "\n";
-	//int *sites = (*td).array;
-	//int *sizes = (*td).array;
 
 	while(getCodeFromBase(td->whole_genome[0][start]) < 0) {
 		start++;
@@ -159,71 +132,34 @@ void *fillArrays(void *threadid) {
 	}
 	pthread_exit(NULL);
 }
-/*
-int *fillArrays(int *sizes, int sum, string &whole_genome) {
-	int *sites = new int[sum];
-	int start = 0;
 
-	while(getCodeFromBase(whole_genome[start]) < 0) {
-		start++;
-	}
-
-	for(unsigned int i = start; i < whole_genome.size()-(KEYLEN-1); i++) {
-
-		int code = getCodeFromBase(whole_genome[i]);
-		if(code >= 0) {
-			int key = getKeyFromKmer(whole_genome, i, i+KEYLEN);
-			if(key >= 0) {
-				int location = sizes[key];
-				sites[location] = i;
-				sizes[key]++;
-			}
-		}
-	}
-	return sites;
-}
-*/
-
-void writeSizes(int *sizes) {
+void writeSizes(int *sizes, string loc) {
 	FILE* pFile;
-	pFile = fopen("sizes", "wb");
+	pFile = fopen(loc.c_str(), "wb");
+	//TODO check if file exist
 	fwrite(sizes, sizeof(int), keyspace, pFile);
 	fclose(pFile);
 }
-/*
-void writeSizes2(int *sizes) {
-	ofstream sizes_output_stream(sizes_file_name.c_str());
-	sizes_output_stream << keyspace;
-	sizes_output_stream << "\n";
-	for(int i = 0; i < keyspace; i++) {
-		sizes_output_stream << sizes[i];
-		sizes_output_stream << "\n";
-	}
-}
-*/
-void writeSites(int *sites, int sum) {
+
+void writeSites(int *sites, int sum, string loc) {
 	FILE* pFile;
-	pFile = fopen("sites", "wb");
+	pFile = fopen(loc.c_str(), "wb");
+	//TODO check if file exist
 	fwrite(sites, sizeof(int), sum, pFile);
 	fclose(pFile);
 }
-/*
-void writeSites2(int *sites, int sum) {
-	ofstream sizes_output_stream(sites_file_name.c_str());
-	sizes_output_stream << sum;
-	sizes_output_stream << "\n";
-	for(int i = 0; i < sum; i++) {
-		sizes_output_stream << sites[i];
-		sizes_output_stream << "\n";
-	}
-}
-*/
+
 int *readArray(string filename, bool write_sum) {
 	FILE * pFile;
 	long lSize;
 	int * buffer;
 
 	pFile = fopen ( filename.c_str() , "rb" );
+
+	if(!pFile) {
+		cout << "File " << filename << " does not exit. Please create index." << endl;
+		exit(-1);
+	}
 
 	// obtain file size:
 	fseek (pFile , 0 , SEEK_END);
@@ -246,20 +182,8 @@ int *readArray(string filename, bool write_sum) {
 	fclose (pFile);
 	return buffer;
 }
-/*
-int *readArray2(string filename, bool write_sum) {
-	ifstream ifs(filename.c_str());
-	int size;
-	ifs >> size;
-	if(write_sum) key_num = size;
-	int *array = new int[size];
-	for(int i = 0; i < size; i++) {
-		ifs >> array[i];
-	}
-	return array;
-}
-*/
-int ** readIndex(string &whole_genome, string genome_ref) {
+
+int ** readIndex(string &whole_genome, string genome_ref, string index_loc) {
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
@@ -277,7 +201,7 @@ int ** readIndex(string &whole_genome, string genome_ref) {
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
 
-	int *sizes = readArray("sizes", false);
+	int *sizes = readArray(index_loc + "//" + "sizes", false);
 
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
@@ -288,20 +212,13 @@ int ** readIndex(string &whole_genome, string genome_ref) {
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	int *sites = readArray("sites", true);
+	int *sites = readArray(index_loc + "//" + "sites", true);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
 
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "Sites loaded: " << timefinal << " seconds." << endl;
-
-	//length_of_sizes = keyspace;
-	//length_of_sites = key_num;
-
-	//length_of_sites = key_num;
-	//cout << "length of sizes: " << length_of_sizes << endl;
-	//cout << "length of sites: " << length_of_sites << endl;
 
 	int **result = new int*[4];
 	result[0] = new int[1];
@@ -313,7 +230,7 @@ int ** readIndex(string &whole_genome, string genome_ref) {
 	return result;
 }
 
-int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref) {
+int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref, string index_loc) {
 
 	extractGenomeFromFile(genome_ref, whole_genome);
 
@@ -321,7 +238,6 @@ int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref) 
 	gettimeofday(&t1, NULL);
 	long startday = t1.tv_sec;
 	long startday2 = t1.tv_usec;
-
 
 	pthread_t threads[4];
 	int rc;
@@ -360,7 +276,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref) 
 	long endday2 = t2.tv_usec;
 
 	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-	cout << "CREATED SIZES: " << timefinal << endl;
+	cout << "Created sizes: " << timefinal << endl;
 
 	int sum=0;
 	for(int i = 0; i < keyspace; i++) {
@@ -374,13 +290,13 @@ int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref) 
 		gettimeofday(&t1, NULL);
 		long startday = t1.tv_sec;
 		long startday2 = t1.tv_usec;
-		writeSizes(sizes);
+		writeSizes(sizes, index_loc + "//sizes");
 		gettimeofday(&t2, NULL);
 		long endday = t2.tv_sec;
 		long endday2 = t2.tv_usec;
 
 		double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-		cout << "WROTE SIZES: " << timefinal << endl;
+		cout << "Wrote sizes: " << timefinal << endl;
 	}
 
 
@@ -418,18 +334,18 @@ int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref) 
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-	cout << "CREATED SITES: " << timefinal << endl;
+	cout << "Created sites: " << timefinal << endl;
 
 	if(write_to_file) {
 		gettimeofday(&t1, NULL);
 		long startday = t1.tv_sec;
 		long startday2 = t1.tv_usec;
-		writeSites(sites, sum);
+		writeSites(sites, sum, index_loc + "//sites");
 		gettimeofday(&t2, NULL);
 		long endday = t2.tv_sec;
 		long endday2 = t2.tv_usec;
 		double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-		cout << "WROTE SITES: " << timefinal << endl;
+		cout << "Wrote sites: " << timefinal << endl;
 	}
 
 	for(int i = keyspace-1; i > 0; i--) {
