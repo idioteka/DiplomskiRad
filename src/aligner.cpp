@@ -326,25 +326,25 @@ int countHits(vector<int> &keys, int *sizes, int max_len) {
 int trimHits(vector<int> &keys, vector<int> &keys_temp, int *sizes, int num_hits) {
 	if(num_hits > 0) {
 		int trigger = (3 * keys_temp.size())/4;
-		if(num_hits < 4 && num_hits < trigger) {
+		if(num_hits < 20 && num_hits < trigger) {
 			for(unsigned int i = 0; i < keys_temp.size(); i++) {
 				keys_temp[i] = keys[i];
 			}
 			num_hits = countHits(keys_temp, sizes, (MAX_LEN * 3) / 2);
 		}
-		if(num_hits < 3 && num_hits < trigger){
+		if(num_hits < 18 && num_hits < trigger){
 			for(unsigned int i=0; i< keys.size(); i++){
 				keys_temp[i] = keys[i];
 			}
 			num_hits = countHits(keys_temp, sizes, MAX_LEN*2);
 		}
-		if(num_hits < 3 && num_hits < trigger){
+		if(num_hits < 16 && num_hits < trigger){
 			for(unsigned int i=0; i< keys.size(); i++){
 				keys_temp[i] = keys[i];
 			}
 			num_hits = countHits(keys_temp, sizes, MAX_LEN*3);
 		}
-		if(num_hits < 2 && num_hits < trigger){
+		if(num_hits < 14 && num_hits < trigger){
 			for(unsigned int i=0; i<keys.size(); i++){
 				keys_temp[i] = keys[i];}
 			num_hits = countHits(keys_temp, sizes, MAX_LEN*5);
@@ -1490,6 +1490,9 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 		outPos++;
 	}
 
+	//cout << read << endl;
+	//cout << ref << endl;
+
 	/*if(r.br == 26) {
 		cout << "er" << endl;
 	}
@@ -1507,6 +1510,7 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 	}
 
 	reverse(out.begin(),out.end());
+
 
 	r.precise_start = r.start-MARIC_PADDING + col;
 	r.precise_stop = r.stop+MARIC_PADDING -addon;
@@ -1557,6 +1561,10 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 		}
 	}
 	else {
+		/*for(int i = 0; i < gaps.size(); i++) {
+			cout << gaps[i] << " ";
+		}
+		cout << endl;*/
 		grefLimit = makeGref(ref, gaps, (refStartLoc - MARIC_PADDING), (refEndLoc + MARIC_PADDING), gref);
 	}
 	//cout << gref << endl;
@@ -1620,6 +1628,14 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 	}
 */
 	fillUnlimited(read, gref, 0, grefLimit, max, packed);
+
+	ofstream test("tmp3/test.out");
+	for(unsigned int i = 0; i < packed[0].size(); i++) {
+		for(unsigned int j = 0; j < packed[0][i].size(); j++) {
+			test << packed[0][i][j] << " ";
+		}
+		test << endl;
+	}
 
 	//string out;
 	//cout << gref << endl;
@@ -1703,6 +1719,7 @@ void makeMatchString(vector<SiteScore> &results, string &read, string &read_reve
 		makeMatchStringForSite(ss, read, sizes, sites, r, whole_genome, threadId);
 	}
 	else {
+		//cout << read_reverse << endl;
 		makeMatchStringForSite(ss, read_reverse, sizes, sites, r, whole_genome, threadId);
 	}
 	resultsFinal.push_back(r);
@@ -1991,109 +2008,126 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 	}
 }
 
-void processRead(int *sizes, int *sites, string &read, vector<Result> &resultsFinal, string &whole_genome, int threadId, int br) {
+void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFinal, string &whole_genome, int threadId, int br) {
 
 	//cout << " " << br << " ";
 
-	string read_reverse;
-	reverseComplementRead(read_reverse, read);
-
-	vector<int> offsets;
-	makeOffsets(read, offsets);
-	vector<int> read_keys;
-	getReadKeys(read, offsets, read_keys);
-	vector<int> read_keys_copy = read_keys;
-
-	int num_hits = countHits(read_keys_copy, sizes, MAX_LEN);
-	num_hits = trimHits(read_keys, read_keys_copy, sizes, num_hits);
-
-	vector<vector<int> > res;
-
-	//TODO add this if if(num_hits < read_keys.size()) {
-	res = shrinkArrays(offsets, read_keys_copy, num_hits);
-
-	offsets = res[0];
-	vector<int> read_keys_final = res[1];
-
-	vector<SiteScore> results;
-
-	bool all_bases_covered = checkIfAllBasesCovered(offsets, read);
-	bool pretend_all_bases_covered = calculatePretendAllBasesCovered(read_keys, read_keys_final, offsets, all_bases_covered, read);
-	bool prescan_qscore = (num_hits >= 5);
-
-	int quick_max_score = calcMaxQuickScore(offsets, read_keys_final);
-
-	int bestScores[6] = {0};
-	vector<int> precounts;
-	vector<int> prescores;
-
-	int hitsCutoff=0;
-	int qscoreCutoff = (int)(MIN_QSCORE_MULT*quick_max_score);
-
-	vector<int> offsets_reversed;
-	reverseOffsets(offsets_reversed, offsets, KEYLEN, read.size());
-
-	vector<int> keys_reversed;
-	reverseComplementKeys(keys_reversed, read_keys_final, KEYLEN);
-
-	//cout << "Read: " << br << " prepared." << endl;
-
-	if(prescan_qscore){
-		vector<vector<int> > prescanResults;
-		prescanAllBlocks(prescanResults, bestScores, read_keys_final, offsets,
-				keys_reversed, offsets_reversed, pretend_all_bases_covered, sizes, sites);
-
-		//cout << "Read: " << br << "prescan all blocks. " << endl;
-
-		precounts=prescanResults[0];
-		prescores=prescanResults[1];
-
-		if(bestScores[1]<MIN_APPROX_HITS_TO_KEEP) {
-			//cout << "best scores: " << bestScores[1] << endl;
-			return;
+	int split_count = 1;
+	int split_size = r1.size() / split_count;
+	for(int i = 0; i < split_count; i++) {
+		/*string read;
+		if(i == 3) {
+			read = r1.substr(1450,550);
 		}
-		if(bestScores[3]<quick_max_score*MIN_QSCORE_MULT2) {
-			//cout << "best scores3: " << bestScores[3] << endl;
-			return;
-		} //if(bestScores[3]<maxQuickScore(offsetsP, keyScoresP)*.10f){return result;}
+		else {
+			read = r1.substr(i * 500,500);
+		}*/
+		string read = r1.substr(i * split_size, split_size);
+	/*	string r2 = read.substr(500,500);
+		string r3 = read.substr(1000,500);
+		string r4 = read.substr(1500,500);*/
 
-		if(bestScores[3]>=quick_max_score && pretend_all_bases_covered){
+		string read_reverse;
+		reverseComplementRead(read_reverse, read);
 
-			hitsCutoff=calcApproxHitsCutoff(read_keys_final.size(), bestScores[1], MIN_APPROX_HITS_TO_KEEP, true);
-			qscoreCutoff=max(qscoreCutoff, (int)(bestScores[3]*DYNAMIC_QSCORE_THRESH_PERFECT));
+		vector<int> offsets;
+		makeOffsets(read, offsets);
+		vector<int> read_keys;
+		getReadKeys(read, offsets, read_keys);
+		vector<int> read_keys_copy = read_keys;
 
-		}else{
-			hitsCutoff=calcApproxHitsCutoff(read_keys_final.size(), bestScores[1], MIN_APPROX_HITS_TO_KEEP, false);
-			qscoreCutoff=max(qscoreCutoff, (int)(bestScores[3]*PRESCAN_QSCORE_THRESH));
+		int num_hits = countHits(read_keys_copy, sizes, MAX_LEN);
+		num_hits = trimHits(read_keys, read_keys_copy, sizes, num_hits);
+
+		vector<vector<int> > res;
+
+		//TODO add this if if(num_hits < read_keys.size()) {
+		res = shrinkArrays(offsets, read_keys_copy, num_hits);
+
+		offsets = res[0];
+		vector<int> read_keys_final = res[1];
+
+		vector<SiteScore> results;
+
+		bool all_bases_covered = checkIfAllBasesCovered(offsets, read);
+		bool pretend_all_bases_covered = calculatePretendAllBasesCovered(read_keys, read_keys_final, offsets, all_bases_covered, read);
+		bool prescan_qscore = (num_hits >= 5);
+
+		int quick_max_score = calcMaxQuickScore(offsets, read_keys_final);
+
+		int bestScores[6] = {0};
+		vector<int> precounts;
+		vector<int> prescores;
+
+		int hitsCutoff=0;
+		int qscoreCutoff = (int)(MIN_QSCORE_MULT*quick_max_score);
+
+		vector<int> offsets_reversed;
+		reverseOffsets(offsets_reversed, offsets, KEYLEN, read.size());
+
+		vector<int> keys_reversed;
+		reverseComplementKeys(keys_reversed, read_keys_final, KEYLEN);
+
+		//cout << "Read: " << br << " prepared." << endl;
+
+		if(prescan_qscore){
+			vector<vector<int> > prescanResults;
+			prescanAllBlocks(prescanResults, bestScores, read_keys_final, offsets,
+					keys_reversed, offsets_reversed, pretend_all_bases_covered, sizes, sites);
+
+			//cout << "Read: " << br << "prescan all blocks. " << endl;
+
+			precounts=prescanResults[0];
+			prescores=prescanResults[1];
+
+			if(bestScores[1]<MIN_APPROX_HITS_TO_KEEP) {
+				//cout << "best scores: " << bestScores[1] << endl;
+				return;
+			}
+			if(bestScores[3]<quick_max_score*MIN_QSCORE_MULT2) {
+				//cout << "best scores3: " << bestScores[3] << endl;
+				return;
+			} //if(bestScores[3]<maxQuickScore(offsetsP, keyScoresP)*.10f){return result;}
+
+			if(bestScores[3]>=quick_max_score && pretend_all_bases_covered){
+
+				hitsCutoff=calcApproxHitsCutoff(read_keys_final.size(), bestScores[1], MIN_APPROX_HITS_TO_KEEP, true);
+				qscoreCutoff=max(qscoreCutoff, (int)(bestScores[3]*DYNAMIC_QSCORE_THRESH_PERFECT));
+
+			}else{
+				hitsCutoff=calcApproxHitsCutoff(read_keys_final.size(), bestScores[1], MIN_APPROX_HITS_TO_KEEP, false);
+				qscoreCutoff=max(qscoreCutoff, (int)(bestScores[3]*PRESCAN_QSCORE_THRESH));
+			}
 		}
+
+		int max_score = calcMaxScore(read);
+
+		bool fully_defined = isFullyDefined(read);
+
+		//cout << "Read: " << br << " prescaned." << endl;
+
+	//	cout << "precounts[0]: " << precounts[0] << endl;
+	//	cout << "prescores[0]: " << prescores[0] << endl;
+	//	cout << "precounts[1]: " << precounts[1] << endl;
+	//	cout << "prescores[1]: " << prescores[1] << endl;
+
+		if(precounts[0] >= hitsCutoff && prescores[0] >= qscoreCutoff) {
+			align(bestScores, read_keys_final, read, offsets, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 0, whole_genome);
+		}
+		if(precounts[1] >= hitsCutoff && prescores[1] >= qscoreCutoff) {
+			align(bestScores, keys_reversed, read_reverse, offsets_reversed, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 1, whole_genome);
+		}
+
+		//cout << "Read: " << br << " aligned." << endl;
+	/*
+		for(unsigned int i = 0; i < results.size(); i++) {
+			cout << "start: " << results[i].start << ", stop: " << results[i].stop << endl;
+		}
+	*/
+
+		makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br+i);
+
 	}
-
-	int max_score = calcMaxScore(read);
-
-	bool fully_defined = isFullyDefined(read);
-
-	//cout << "Read: " << br << " prescaned." << endl;
-
-//	cout << "precounts[0]: " << precounts[0] << endl;
-//	cout << "prescores[0]: " << prescores[0] << endl;
-//	cout << "precounts[1]: " << precounts[1] << endl;
-//	cout << "prescores[1]: " << prescores[1] << endl;
-
-	if(precounts[0] >= hitsCutoff && prescores[0] >= qscoreCutoff) {
-		align(bestScores, read_keys_final, read, offsets, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 0, whole_genome);
-	}
-	if(precounts[1] >= hitsCutoff && prescores[1] >= qscoreCutoff) {
-		align(bestScores, keys_reversed, read_reverse, offsets_reversed, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 1, whole_genome);
-	}
-
-	//cout << "Read: " << br << " aligned." << endl;
-/*
-	for(unsigned int i = 0; i < results.size(); i++) {
-		cout << "start: " << results[i].start << ", stop: " << results[i].stop << endl;
-	}
-*/
-	makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br);
-
 	return;
 }
 
@@ -2119,6 +2153,7 @@ void writeResults(vector<vector<Result> > &set_of_results, string infile) {
 			results.push_back(set_of_results[i][j]);
 		}
 	}
+	cout << "size of results: " << results.size() << endl;
 	sortResults(results);
 	ofstream out_res(infile.c_str());
 	int br = 1;
@@ -2301,8 +2336,17 @@ void *preProcessRead(void *threadid) {
 	ThreadData3 *td = (ThreadData3 *) threadid;
 	for(int i = td->start; i < td->stop; i++) {
 
+		string read = (*(td->reads))[i];
+		/*string r1 = read.substr(0,500);
+		string r2 = read.substr(500,500);
+		string r3 = read.substr(1000,500);
+		string r4 = read.substr(1500,500);*/
+
 		if((i+1)%100 == 0) cout << "Read: " << i+1 << " started." << endl;
-		processRead(td->sizes, td->sites, (*(td->reads))[i], *(td->results), *(td->whole_genome),  td->thread_id, i+1);
+		processRead(td->sizes, td->sites, read, *(td->results), *(td->whole_genome),  td->thread_id, i+1);
+		/*processRead(td->sizes, td->sites, r1, *(td->results), *(td->whole_genome),  td->thread_id, i+1);
+		processRead(td->sizes, td->sites, r1, *(td->results), *(td->whole_genome),  td->thread_id, i+1);
+		processRead(td->sizes, td->sites, r1, *(td->results), *(td->whole_genome),  td->thread_id, i+1);*/
 	}
 	pthread_exit(NULL);
 }
