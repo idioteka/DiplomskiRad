@@ -3,6 +3,7 @@
 #include "heap.h"
 
 struct Statistic {
+	int covered;
 	int reads;
 	int reads_with_result;
 	int gapped;
@@ -32,6 +33,7 @@ struct Statistic {
 	int ungapped_percentage;
 	int ungapped_precise_percentage;
 	Statistic(int num_reads) {
+		covered = 0,
 		reads = num_reads;
 		reads_with_result = 0;
 		gapped = 0;
@@ -159,6 +161,37 @@ void gapArrayFromString(vector<int> &gapArray, string str) {
 	}
 }
 
+std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
+    std::stringstream ss(s);
+    std::string item;
+    while (std::getline(ss, item, delim)) {
+        elems.push_back(item);
+    }
+    return elems;
+}
+
+void readGapArray(Result &r, string line) {
+	std::vector<std::string> elems;
+	split(line, ' ', elems);
+	for(unsigned int i = 0; i < elems.size(); i++) {
+		//cout << elems[i] << endl;
+		string tmp;
+		if(i != elems.size() - 1) {
+			tmp = elems[i].substr(0, elems[i].size()-1);
+		}
+		else {
+			tmp = elems[i];
+		}
+		vector<string> el;
+		//cout << tmp << endl;
+		split(tmp, '-', el);
+		r.gapArray.push_back(atoi(el[0].c_str()));
+		r.gapArray.push_back(atoi(el[1].c_str()));
+	}
+	/*for(unsigned int i = 0; i < r.gapArray.size(); i++) {
+		cout << r.gapArray[i] << endl;
+	}*/
+}
 
 void readReads(vector<string> &reads, map<int, Result> &results, string infile) {
 	ifstream ifs(infile.c_str());
@@ -182,12 +215,14 @@ void readReads(vector<string> &reads, map<int, Result> &results, string infile) 
 		getline(ifs, line6);
 		//int br = atoi(line.c_str());
 		Result r = Result(br, atoi(line2.c_str()), atoi(line3.c_str()));
+		//readGapArray(r, line5);
 		r.matchString = line4;
 		gapArrayFromString(r.gapArray, line5);
 		//results.push_back(r);
 		std::map<int,Result>::iterator it = results.begin();
 		results.insert(it, pair<int,Result>(br, r));
 		reads.push_back(line6);
+		total_base_num += line6.size();
 		br++;
 	}
 }
@@ -2012,7 +2047,6 @@ void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFina
 
 	//cout << " " << br << " ";
 
-	int split_count = 1;
 	int split_size = r1.size() / split_count;
 	for(int i = 0; i < split_count; i++) {
 		/*string read;
@@ -2125,7 +2159,10 @@ void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFina
 		}
 	*/
 
-		makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br+i);
+		if(results.size() != 0) {
+			makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br);
+			aligned_base_num += read.size();
+		}
 
 	}
 	return;
@@ -2145,7 +2182,7 @@ void sortResults(vector<Result> &results) {
 	}
 }
 
-void writeResults(vector<vector<Result> > &set_of_results, string infile) {
+void writeResults(vector<vector<Result> > &set_of_results, map<int, Result> correct_results, string infile) {
 
 	vector<Result> results;
 	for(unsigned int i = 0; i < set_of_results.size(); i++) {
@@ -2159,8 +2196,11 @@ void writeResults(vector<vector<Result> > &set_of_results, string infile) {
 	int br = 1;
 	for(unsigned int i = 0; i < results.size(); i++) {
 		Result r = results[i];
+		map<int, Result>::iterator pos = correct_results.find(r.br);
+		Result r2 = pos->second;
 		out_res << r.br << "-" << r.start << "-" << r.stop << "-" << (r.stop-r.start) << endl;
-		out_res << r.precise_start << "-" << r.precise_stop << endl;
+		//out_res << r.precise_start << "-" << r.precise_stop << endl;
+		out_res << r2.br << "-" << r2.start << "-" << r2.stop << "-" << (r2.stop-r2.start) << endl;
 		out_res << r.matchString << endl;
 		br++;
 	}
@@ -2194,6 +2234,42 @@ int calculateGappedPrecisePercentage(int precise_start, int precise_stop, int st
 	}
 
 	return number;
+}
+
+int calculateOverlap(int start1, int stop1, int start2, int stop2) {
+	if(start1 <= start2 && stop1 >= stop2) return (stop2-start2);
+	else if(start2 <= start1 && stop2 >= stop1) return (stop1-start1);
+	else if(start1 <= start2 && stop2 >= stop1) return (stop1-start2);
+	else if(start2 <= start1 && stop1 >= stop2) return (stop2-start1);
+	else return 0;
+}
+
+void calculateStatistics2(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
+	int sum = 0;
+	if(r1.gapArray.size() == 0) {
+		r1.gapArray.push_back(r1.start);
+		r1.gapArray.push_back(r1.stop);
+	}
+	for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
+		for(unsigned int j = 0; j < r1.gapArray.size(); j+=2) {
+			if(overlap(r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1])) {
+				int tmp = calculateOverlap(r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1]);
+				sum += tmp;
+				//out_stat << r1.gapArray[j] << "-" << r1.gapArray[j+1] << "  " << r2.gapArray[i] << "-" << r2.gapArray[i+1] << " (" << tmp << ")" << endl;
+			}
+		}
+	}
+	//out_stat << "bases overlap: " << sum << endl;
+	/*for(unsigned int i = 0;  i < r1.gapArray.size(); i++) {
+		out_stat << r1.gapArray[i] << " ";
+	}
+	out_stat << endl;
+	for(unsigned int i = 0;  i < r2.gapArray.size(); i++) {
+		out_stat << r2.gapArray[i] << " ";
+	}*/
+//	out_stat << endl;
+	statistics.covered += sum;
+
 }
 
 void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
@@ -2282,6 +2358,7 @@ void writeStatistics(vector<vector<Result> > &set_of_results, map<int, Result> &
 			map<int, Result>::iterator pos = correct_results.find(r1.br);
 			Result r2 = pos->second;
 			calculateStatistics(r1, r2, out_stat, statistic);
+			calculateStatistics2(r1, r2, out_stat, statistic);
 		}
 	}
 
@@ -2326,7 +2403,9 @@ void writeStatistics(vector<vector<Result> > &set_of_results, map<int, Result> &
 	out_stat << "gapped_percentage: " << gapped_percentage << endl;
 	out_stat << "gapped_precise_correct_bases: " << statistic.gapped_precise_percentage << endl;
 	out_stat << "gapped_precise_percentage: " << gapped_precise_percentage << endl;
-
+	out_stat << "covered: " << statistic.covered << endl;
+	out_stat << "covered by aligned reads: " << 100 * (statistic.covered / (double) aligned_base_num) << "%" << endl;
+	out_stat << "covered by total reads: " << 100 * (statistic.covered / (double) total_base_num) << "%" << endl;
 	out_stat.close();
 
 }
@@ -2360,10 +2439,24 @@ void checkParameter(string command, string value) {
 			index_location = value;
 			cout << "Index location set to '" << index_location << "'." << endl;
 		}
+		else if(strcmp(command.c_str(), "-b") == 0) {
+			build_number = atoi(value.c_str());
+			cout << "Build number set to " << value << "." << endl;
+		}
 		else if(strcmp(command.c_str(), "-c") == 0) {
 			overwrite_index = true;
+			build_number = atoi(value.c_str());
 			cout << "Index will be created. If index was previously created at ";
 			cout << "set location it will be overwriten." << endl;
+			cout << "Build number overwriten to " << value << "." << endl;
+		}
+		else if(strcmp(command.c_str(), "-s") == 0) {
+			split_count = atoi(value.c_str());
+			cout << "Reads will be split at " << value << " parts." << endl;
+		}
+		else if(strcmp(command.c_str(), "-k") == 0) {
+			KEYLEN = atoi(value.c_str());
+			cout << "KEYLEN set to " << value << "." << endl;
 		}
 		else {
 			cout << "Parameter " << command << " not recognized." << endl;
@@ -2382,10 +2475,13 @@ int main(int argc, char *argv[]) {
 		//cout << "<reults_file> - file where resulting alignments will be stored." << endl;
 		//cout << "<statistics_file> - file where statistics will be stored." << endl;
 		cout << "-t <thread_number> - Optional parameter. Number of threads, default 4." << endl;
+		cout << "-k <KEYLEN> - Optional parameter. Length of the key. Default 13." << endl;
+		cout << "-b <build_number> - Optional parameter. Build number of the index. By default set to 1." << endl;
 		cout << "-i <index_location> - Optional parameter. Location of created index if index exists at <index_location>. If index does not exist, program creates index at <index_location>. " << endl;
 		cout << "By default program looks for index in the <destination_folder> location. If there is no index, by default program creates new index in <destination_folder>" << endl;
 		cout << "If you wish to create index even if it exists use -c <create_index> option." << endl;
-		cout << "-o <create_index> use 1 if you wish to create index even if index exist at given location. This will overwrite previously created index at given location." << endl;
+		cout << "-o <build_number> - Optional parameter. Use if you wish to create index even if index exist at given location. This will overwrite previously created index at given location. It should be called with build number; for example: -c 2." << endl;
+		cout << "-s <split_count> - Optional parameter. At how many party every read should be split. Default no split.";
 		cout << "" << endl;
 		return -1;
 	}
@@ -2434,15 +2530,29 @@ int main(int argc, char *argv[]) {
 	if (stat(index_location.c_str(), &sb) == 0 && S_ISDIR(sb.st_mode)) {
 		FILE *pFile;
 		FILE *pFile2;
-		string sizes_location = index_location + "//sizes";
-		string sites_location = index_location + "//sites";
+		FILE *pFile3;
+		string build = SSTR(build_number);
+		string sizes_location = index_location + "//sizes" + build;
+		string sites_location = index_location + "//sites" + build;
+		//cout << sites_location << endl;
+		string info_location = index_location + "//index" + build + ".info";
 		pFile = fopen( sizes_location.c_str() , "rb" );
 		pFile2 = fopen(sites_location.c_str(), "rb");
+		pFile3 = fopen(info_location.c_str(), "rb");
 
-		if(!pFile || !pFile2) {
+		if(!pFile || !pFile2 || !pFile3) {
 			cout << "Index does not exist at location '" << index_location << "'." << endl;
 			cout << "Index will be created at location '" << index_location << "'." << endl;
 			read_index = false;
+		}
+		else {
+			/*string line
+			ifstream index_info(info_location.c_str());
+			vector<string> elems;
+			while(getline(index_info, line)) {
+				split(line, ':', elems);
+				if()
+			}*/
 		}
 		if(pFile) {
 			fclose(pFile);
@@ -2478,7 +2588,7 @@ int main(int argc, char *argv[]) {
 	}
 	else {
 		cout << "Creating index..." << endl;
-		res = createIndex(true, whole_genome, genome_ref, index_location);
+		res = createIndex(true, whole_genome, genome_ref, index_location, KEYLEN, keyspace, build_number);
 	}
 
 	cout << "genome size: " << whole_genome.size() << endl;
@@ -2519,9 +2629,10 @@ int main(int argc, char *argv[]) {
 	for(int i = 0; i < thread_num; i++) {
 		int start =  i*difference;
 		int stop =  i*difference + difference;
+		//cout << "thread: " << i << " " << start << "-" << stop << endl;
 		datas3[i] = ThreadData3(i, sizes, sites, &reads, start, stop, &whole_genome, &set_of_results[i]);
 	}
-	datas3[3].stop = reads.size();
+	datas3[thread_num-1].stop = reads.size();
 	for(int i = 0; i < thread_num; i++) {
 		cout << "Thread " << i << " started." << endl;
 		rc = pthread_create(&threads[i], NULL, preProcessRead, (void *) &datas3[i]);
@@ -2552,7 +2663,7 @@ int main(int argc, char *argv[]) {
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	writeResults(set_of_results, outdir + "//" + "results.txt");
+	writeResults(set_of_results, correct_results, outdir + "//" + "results.txt");
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;

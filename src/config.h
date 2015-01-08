@@ -21,6 +21,9 @@
 
 using namespace std;
 
+#define SSTR( x ) dynamic_cast< std::ostringstream & >( \
+        ( std::ostringstream() << std::dec << x ) ).str()
+
 static string outdir;
 static string index_location;
 static bool overwrite_index = false;
@@ -53,8 +56,14 @@ static int POINTSoff_INS_ARRAY[] = {0, -808960, -79872, -79872, -79872, -79872, 
 
 static bool write_output = false;
 
-static int KEYLEN = 12;
+static int split_count = 1;
+static int total_base_num = 0;
+static int aligned_base_num = 0;
+
+static int KEYLEN = 13;
 static int keyspace = pow(2, 2*KEYLEN);
+
+static int build_number = 1;
 
 static float MIN_QSCORE_MULT2 = 0.1;
 static float PRESCAN_QSCORE_THRESH = 0.57;

@@ -201,7 +201,8 @@ int ** readIndex(string &whole_genome, string genome_ref, string index_loc) {
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
 
-	int *sizes = readArray(index_loc + "//" + "sizes", false);
+	string build = SSTR(build_number);
+	int *sizes = readArray(index_loc + "//" + "sizes" + build, false);
 
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
@@ -212,7 +213,7 @@ int ** readIndex(string &whole_genome, string genome_ref, string index_loc) {
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	int *sites = readArray(index_loc + "//" + "sites", true);
+	int *sites = readArray(index_loc + "//" + "sites" + build, true);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
@@ -230,7 +231,20 @@ int ** readIndex(string &whole_genome, string genome_ref, string index_loc) {
 	return result;
 }
 
-int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref, string index_loc) {
+void writeInfo(int sizes, int sites, string path) {
+	string build = SSTR(build_number);
+	ofstream ofs((path + "//index" + build + ".info").c_str());
+	ofs << "build number:" << build_number << endl;
+	ofs << "sizes size:" << sizes << endl;
+	ofs << "sites size:" << sites << endl;
+	ofs << "KEYLEN:" << KEYLEN << endl;
+}
+
+int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref, string index_loc, int keylen, int kspace, int build_num) {
+
+	KEYLEN = keylen;
+	keyspace = kspace;
+	build_number = build_num;
 
 	extractGenomeFromFile(genome_ref, whole_genome);
 
@@ -290,7 +304,8 @@ int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref, 
 		gettimeofday(&t1, NULL);
 		long startday = t1.tv_sec;
 		long startday2 = t1.tv_usec;
-		writeSizes(sizes, index_loc + "//sizes");
+		string build = SSTR(build_number);
+		writeSizes(sizes, index_loc + "//sizes" + build);
 		gettimeofday(&t2, NULL);
 		long endday = t2.tv_sec;
 		long endday2 = t2.tv_usec;
@@ -340,7 +355,8 @@ int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref, 
 		gettimeofday(&t1, NULL);
 		long startday = t1.tv_sec;
 		long startday2 = t1.tv_usec;
-		writeSites(sites, sum, index_loc + "//sites");
+		string build = SSTR(build_number);
+		writeSites(sites, sum, index_loc + "//sites" + build);
 		gettimeofday(&t2, NULL);
 		long endday = t2.tv_sec;
 		long endday2 = t2.tv_usec;
@@ -353,6 +369,8 @@ int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref, 
 	}
 	sizes[0] = 0;
 
+	writeInfo(keyspace, sum, index_loc);
+
 	int **result = new int*[4];
 	result[0] = new int[1];
 	result[0][0] = keyspace;
@@ -362,7 +380,6 @@ int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref, 
 	result[3] = sites;
 	return result;
 
-	return result;
 }
 
 int main2(int argc, char *argv[]) {
