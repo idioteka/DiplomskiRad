@@ -161,38 +161,6 @@ void gapArrayFromString(vector<int> &gapArray, string str) {
 	}
 }
 
-std::vector<std::string> &split(const std::string &s, char delim, std::vector<std::string> &elems) {
-    std::stringstream ss(s);
-    std::string item;
-    while (std::getline(ss, item, delim)) {
-        elems.push_back(item);
-    }
-    return elems;
-}
-
-void readGapArray(Result &r, string line) {
-	std::vector<std::string> elems;
-	split(line, ' ', elems);
-	for(unsigned int i = 0; i < elems.size(); i++) {
-		//cout << elems[i] << endl;
-		string tmp;
-		if(i != elems.size() - 1) {
-			tmp = elems[i].substr(0, elems[i].size()-1);
-		}
-		else {
-			tmp = elems[i];
-		}
-		vector<string> el;
-		//cout << tmp << endl;
-		split(tmp, '-', el);
-		r.gapArray.push_back(atoi(el[0].c_str()));
-		r.gapArray.push_back(atoi(el[1].c_str()));
-	}
-	/*for(unsigned int i = 0; i < r.gapArray.size(); i++) {
-		cout << r.gapArray[i] << endl;
-	}*/
-}
-
 void readReads(vector<string> &reads, map<int, Result> &results, string infile) {
 	ifstream ifs(infile.c_str());
 	if(!ifs) {
@@ -213,12 +181,9 @@ void readReads(vector<string> &reads, map<int, Result> &results, string infile) 
 		getline(ifs, line4);
 		getline(ifs, line5);
 		getline(ifs, line6);
-		//int br = atoi(line.c_str());
 		Result r = Result(br, atoi(line2.c_str()), atoi(line3.c_str()));
-		//readGapArray(r, line5);
 		r.matchString = line4;
 		gapArrayFromString(r.gapArray, line5);
-		//results.push_back(r);
 		std::map<int,Result>::iterator it = results.begin();
 		results.insert(it, pair<int,Result>(br, r));
 		reads.push_back(line6);
@@ -226,7 +191,6 @@ void readReads(vector<string> &reads, map<int, Result> &results, string infile) 
 		br++;
 	}
 }
-
 
 /*
  *
@@ -316,10 +280,6 @@ int reverseComplementBinary(int kmer, int k){
 
 int countKeyHits(int key, int *sizes) {
 	int x;
-	if(key >= length_of_sizes) {
-		//cout << "length: "  << length_of_sizes << endl;
-		//cout << "key: " << key << endl;
-	}
 	if(key+1 == length_of_sizes) {
 		x = length_of_sites - sizes[key];
 	}
@@ -978,8 +938,6 @@ void findMaxQscore2(vector<int> &starts, vector<int> &stops, vector<int> &offset
 void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], vector<int> &keysP, vector<int> &offsetsP,
 		vector<int> &keysM, vector<int> &offsetsM, bool allBasesCovered, int *sizes, int *sites){
 
-//	cout << "offsets.size(): " << offsetsP.size() << ", offsetsM.size(): " << offsetsM.size() << "\n";
-
 	int bestqscore = 0;
 	int maxHits = 0;
 	int minHitsToScore = MIN_APPROX_HITS_TO_KEEP;
@@ -990,7 +948,6 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 	vector<int> scores;
 	prescanResults.push_back(counts);
 	prescanResults.push_back(scores);
-	//vector<vector<int> > ret;
 
 	vector<int> keys = keysP;
 	vector<int> offsets = offsetsP;
@@ -1001,8 +958,6 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 	int numHits = getHits(keys, std::numeric_limits<int>::max(), starts, stops, sizes);
 
 	if(numHits < minHitsToScore){
-		//scores.push_back(-9999);
-		//counts.push_back(0);
 		prescanResults[0].push_back(0);
 		prescanResults[1].push_back(-9999);
 	}else{
@@ -1016,18 +971,14 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 			}
 		}
 
-		//heap.clear();
 		vector<Triplet> triples;
 		vector<int> values;
 
 		vector<int> temp;
-		//cout << "findMaxQscore2" << endl;
 
 		findMaxQscore2(starts, stops, offsets, triples, values, keys, minHitsToScore, true,
 				bestqscore>=maxQuickScore_ && allBasesCovered, sizes, sites, temp);
 
-		//scores.push_back(temp[0]);
-		//counts.push_back(temp[1]);
 		prescanResults[0].push_back(temp[1]);
 		prescanResults[1].push_back(temp[0]);
 
@@ -1038,8 +989,6 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 			minHitsToScore=max(minHitsToScore, maxHits);
 			bestScores[1]=max(bestScores[1], maxHits);
 			bestScores[3]=max(bestScores[3], bestqscore);
-			//prescanResults.push_back(counts);
-			//prescanResults.push_back(scores);
 			return;
 		}
 	}
@@ -1054,8 +1003,6 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 	numHits = getHits(keys, std::numeric_limits<int>::max(), starts, stops, sizes);
 
 	if(numHits < minHitsToScore){
-		//scores.push_back(-9999);
-		//counts.push_back(0);
 		prescanResults[0].push_back(0);
 		prescanResults[1].push_back(-9999);
 	}else{
@@ -1069,17 +1016,12 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 			}
 		}
 
-		//heap.clear();
 		vector<Triplet> triples;
 		vector<int> values;
 
 		vector<int> temp;
-		//cout << "findMaxQscore22" << endl;
 		findMaxQscore2(starts, stops, offsets, triples, values, keys, minHitsToScore, true,
 				bestqscore>=maxQuickScore_ && allBasesCovered, sizes, sites, temp);
-
-		//scores.push_back(temp[0]);
-		//counts.push_back(temp[1]);
 
 		prescanResults[0].push_back(temp[1]);
 		prescanResults[1].push_back(temp[0]);
@@ -1091,8 +1033,6 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 			minHitsToScore=max(minHitsToScore, maxHits);
 			bestScores[1]=max(bestScores[1], maxHits);
 			bestScores[3]=max(bestScores[3], bestqscore);
-			//prescanResults.push_back(counts);
-			//prescanResults.push_back(scores);
 			return;
 		}
 	}
@@ -1101,8 +1041,6 @@ void prescanAllBlocks(vector<vector<int> > &prescanResults, int bestScores[], ve
 	bestScores[1]=max(bestScores[1], maxHits);
 	bestScores[3]=max(bestScores[3], bestqscore);
 
-	//prescanResults.push_back(counts);
-	//prescanResults.push_back(scores);
 	return;
 }
 
@@ -1120,7 +1058,6 @@ void reverseComplementKeys(vector<int> &reversed_keys, vector<int> &keys ,int k)
 }
 
 void reverseOffsets(vector<int> &offsets_reversed, vector<int> &offsets, int k, int readlen) {
-
 	for(unsigned int i = 0; i < offsets.size(); i++){
 		int x = offsets[offsets.size()-i-1];
 		x = readlen - (x+k);
@@ -1248,15 +1185,15 @@ int makeGref(string &ref, vector<int> &gaps, int refStartLoc, int refEndLoc, str
 	return greflimit;
 }
 
-void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, int max[], vector<vector<vector<int> > > &packed) {
+void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, long max[], vector<vector<vector<long> > > &packed) {
 	int rows = read.size();
 	int columns = refEndLoc-refStartLoc+1;
 
-	int maxGain = (read.size()-1) * POINTSoff_MATCH2+POINTSoff_MATCH;
-	int subfloor = 0-2*maxGain;
-	int BARRIER_I2 = rows-BARRIER_I1;
-	int BARRIER_I2b = columns-1;
-	int BARRIER_D2 = rows-BARRIER_D1;
+	long maxGain = (read.size()-1) * POINTSoff_MATCH2+POINTSoff_MATCH;
+	long subfloor = 0-2*maxGain;
+	long BARRIER_I2 = rows-BARRIER_I1;
+	long BARRIER_I2b = columns-1;
+	long BARRIER_D2 = rows-BARRIER_D1;
 
 	for(int row=1; row<=rows; row++){
 		for(int col=1; col<=columns; col++){
@@ -1274,21 +1211,22 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 				packed[MODE_MS][row][col]=subfloor;
 			}else{//Calculate match and sub scores
 
-				int scoreFromDiag=packed[MODE_MS][row-1][col-1]&SCOREMASK;
-				int scoreFromDel=packed[MODE_DEL][row-1][col-1]&SCOREMASK;
-				int scoreFromIns=packed[MODE_INS][row-1][col-1]&SCOREMASK;
-				int streak=(packed[MODE_MS][row-1][col-1]&TIMEMASK);
+				long scoreFromDiag=packed[MODE_MS][row-1][col-1]&SCOREMASK;
+				long scoreFromDel=packed[MODE_DEL][row-1][col-1]&SCOREMASK;
+				long scoreFromIns=packed[MODE_INS][row-1][col-1]&SCOREMASK;
+				long streak=(packed[MODE_MS][row-1][col-1]&TIMEMASK);
 
 				{//Calculate match/sub score
 
 					if(match){
 
-						int scoreMS=scoreFromDiag+(prevMatch ? POINTSoff_MATCH2 : POINTSoff_MATCH);
-						int scoreD=scoreFromDel+POINTSoff_MATCH;
-						int scoreI=scoreFromIns+POINTSoff_MATCH;
+						long scoreMS=scoreFromDiag+(prevMatch ? POINTSoff_MATCH2 : POINTSoff_MATCH);
 
-						int score;
-						int time;
+						long scoreD=scoreFromDel+POINTSoff_MATCH;
+						long scoreI=scoreFromIns+POINTSoff_MATCH;
+
+						long score;
+						long time;
 						if(scoreMS>=scoreD && scoreMS>=scoreI){
 							score=scoreMS;
 							time=(prevMatch ? streak+1 : 1);
@@ -1305,7 +1243,7 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 
 					}else{
 
-						int scoreMS;
+						long scoreMS;
 						if(ref1!='N' && call1!='N'){
 							scoreMS=scoreFromDiag+(prevMatch ? (streak<=1 ? POINTSoff_SUBR : POINTSoff_SUB) :
 								POINTSoff_SUB_ARRAY[streak+1]);
@@ -1313,11 +1251,11 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 							scoreMS=scoreFromDiag+POINTSoff_NOCALL;
 						}
 
-						int scoreD=scoreFromDel+POINTSoff_SUB; //+2 to move it as close as possible to the deletion / insertion
-						int scoreI=scoreFromIns+POINTSoff_SUB;
+						long scoreD=scoreFromDel+POINTSoff_SUB; //+2 to move it as close as possible to the deletion / insertion
+						long scoreI=scoreFromIns+POINTSoff_SUB;
 
-						int score;
-						int time;
+						long score;
+						long time;
 						if(scoreMS>=scoreD && scoreMS>=scoreI){
 							score=scoreMS;
 							time=(prevMatch ? 1 : streak+1);
@@ -1341,13 +1279,14 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 				packed[MODE_DEL][row][col]=subfloor;
 			}else{//Calculate DEL score
 
-				int streak=packed[MODE_DEL][row][col-1]&TIMEMASK;
+				long streak=packed[MODE_DEL][row][col-1]&TIMEMASK;
 
-				int scoreFromDiag=packed[MODE_MS][row][col-1]&SCOREMASK;
-				int scoreFromDel=packed[MODE_DEL][row][col-1]&SCOREMASK;
+				long scoreFromDiag=packed[MODE_MS][row][col-1]&SCOREMASK;
+				long scoreFromDel=packed[MODE_DEL][row][col-1]&SCOREMASK;
 
-				int scoreMS=scoreFromDiag+POINTSoff_DEL;
-				int scoreD=scoreFromDel+(streak==0 ? POINTSoff_DEL :
+				long scoreMS=scoreFromDiag+POINTSoff_DEL;
+
+				long scoreD=scoreFromDel+(streak==0 ? POINTSoff_DEL :
 					streak<LIMIT_FOR_COST_3 ? POINTSoff_DEL2 :
 						streak<LIMIT_FOR_COST_4 ? POINTSoff_DEL3 :
 							streak<LIMIT_FOR_COST_5 ? POINTSoff_DEL4 :
@@ -1357,12 +1296,14 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 					scoreMS+=POINTSoff_DEL_REF_N;
 					scoreD+=POINTSoff_DEL_REF_N;
 				}else if(gap){
+					long tmp = scoreMS;
+					long tmp2 = scoreD;
 					scoreMS+=POINTSoff_GAP;
 					scoreD+=POINTSoff_GAP;
 				}
 
-				int score;
-				int time;
+				long score;
+				long time;
 				if(scoreMS>=scoreD){
 					score=scoreMS;
 					time=1;
@@ -1380,16 +1321,16 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 				packed[MODE_INS][row][col]=subfloor;
 			}else{//Calculate INS score
 
-				int streak=packed[MODE_INS][row-1][col]&TIMEMASK;
+				long streak=packed[MODE_INS][row-1][col]&TIMEMASK;
 
-				int scoreFromDiag=packed[MODE_MS][row-1][col]&SCOREMASK;
-				int scoreFromIns=packed[MODE_INS][row-1][col]&SCOREMASK;
+				long scoreFromDiag=packed[MODE_MS][row-1][col]&SCOREMASK;
+				long scoreFromIns=packed[MODE_INS][row-1][col]&SCOREMASK;
 
-				int scoreMS=scoreFromDiag+POINTSoff_INS;
-				int scoreI=scoreFromIns+POINTSoff_INS_ARRAY[streak+1];
+				long scoreMS=scoreFromDiag+POINTSoff_INS;
+				long scoreI=scoreFromIns+POINTSoff_INS_ARRAY[streak+1];
 
-				int score;
-				int time;
+				long score;
+				long time;
 				if(scoreMS>=scoreI){
 					score=scoreMS;
 					time=1;
@@ -1410,7 +1351,7 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 
 	for(int state=0; state<3; state++){
 		for(int col=1; col<=columns; col++){
-			int x=packed[state][rows][col]&SCOREMASK;
+			long x=packed[state][rows][col]&SCOREMASK;
 			if(x>maxScore){
 				maxScore=x;
 				maxCol=col;
@@ -1425,12 +1366,8 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, in
 	max[2] = maxState;
 	max[3] = maxScore;
 }
-
-void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int row, int col, int state, Result &r, vector<vector<vector<int> > > &packed) {
-
-	/*if(r.br == 26) {
-		cout << "here" << endl;
-	}*/
+/*
+void traceback2(string &read, string &ref, int refStartLoc, int refEndLoc, int row, int col, int state, Result &r, vector<vector<vector<long> > > &packed) {
 
 	int outPos=0;
 	int gaps=0;
@@ -1438,32 +1375,19 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 	int addon = refEndLoc - col;
 
 	string out;
-
-	//string out;
+	string rout;
 
 	while(row>0 && col>0){
 
-		//cout << out.capacity() << " ";
-		//cout << out.size() << " ";
-		//cout << col << " " << endl;
-		/*if(col == 143) {
-			//cout << out << endl;
-			cout << out.capacity() << endl;
-			cout << out.size() << endl;
-			if(out.capacity() == out.size()) {
-				out.reserve(out.size()+1);
-			}
-		}*/
-
-		int time=packed[state][row][col]&TIMEMASK;
-		int prev;
+		long time=packed[state][row][col]&TIMEMASK;
+		long prev;
 
 		if(state==MODE_MS){
-			if(time>1){prev=(int)state;}
+			if(time>1){prev=(long)state;}
 			else{
-				int scoreFromDiag=packed[MODE_MS][row-1][col-1]&SCOREMASK;
-				int scoreFromDel=packed[MODE_DEL][row-1][col-1]&SCOREMASK;
-				int scoreFromIns=packed[MODE_INS][row-1][col-1]&SCOREMASK;
+				long scoreFromDiag=packed[MODE_MS][row-1][col-1]&SCOREMASK;
+				long scoreFromDel=packed[MODE_DEL][row-1][col-1]&SCOREMASK;
+				long scoreFromIns=packed[MODE_INS][row-1][col-1]&SCOREMASK;
 				if(scoreFromDiag>=scoreFromDel && scoreFromDiag>=scoreFromIns){prev=MODE_MS;}
 				else if(scoreFromDel>=scoreFromIns){prev=MODE_DEL;}
 				else{prev=MODE_INS;}
@@ -1472,20 +1396,19 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 			char c=toupper(read[row-1]);
 			char r=toupper(ref[refStartLoc+col-1]);
 			if(c==r){
-				out.push_back('m');
-				//cout << 'm';
+				out.push_back('M');
+				rout.push_back(r);
 			}else{
-				out.push_back('s');
-				//cout << 'S';
+				out.push_back('S');
+				rout.push_back(r);
 			}
-
 			row--;
 			col--;
 		}else if(state==MODE_DEL){
-			if(time>1){prev=(int)state;}
+			if(time>1){prev=(long)state;}
 			else{
-				int scoreFromDiag=packed[MODE_MS][row][col-1]&SCOREMASK;
-				int scoreFromDel=packed[MODE_DEL][row][col-1]&SCOREMASK;
+				long scoreFromDiag=packed[MODE_MS][row][col-1]&SCOREMASK;
+				long scoreFromDel=packed[MODE_DEL][row][col-1]&SCOREMASK;
 				if(scoreFromDiag>=scoreFromDel){prev=MODE_MS;}
 				else{prev=MODE_DEL;}
 			}
@@ -1493,30 +1416,27 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 			char r=toupper(ref[refStartLoc+col-1]);
 			if(r==GAPC){
 				out.push_back('-');
-				//cout << '-';
 				gaps++;
+				rout.push_back('-');
 			}else{
-				out.push_back('d');
-				//cout << 'D';
+				out.push_back('D');
+				rout.push_back(r);
 			}
 			col--;
 		}else{
-			if(time>1){prev=(int)state;}
+			if(time>1){prev=(long)state;}
 			else{
-				int scoreFromDiag=packed[MODE_MS][row-1][col]&SCOREMASK;
-				int scoreFromIns=packed[MODE_INS][row-1][col]&SCOREMASK;
+				long scoreFromDiag=packed[MODE_MS][row-1][col]&SCOREMASK;
+				long scoreFromIns=packed[MODE_INS][row-1][col]&SCOREMASK;
 				if(scoreFromDiag>=scoreFromIns){prev=MODE_MS;}
 				else{prev=MODE_INS;}
 			}
 
 			if(col==0){
-				out.push_back('x');
-				//cout << 'X';
-			//}else if(col>=5000){
-		//		out.push_back('Y'); //TODO
+				rout.push_back('x');
 			}else{
-				out.push_back('i');
-				//cout << 'I';
+				rout.push_back('I');
+				out.push_back(toupper(read[row-1]));
 			}
 			row--;
 		}
@@ -1525,16 +1445,10 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 		outPos++;
 	}
 
-	//cout << read << endl;
-	//cout << ref << endl;
-
-	/*if(r.br == 26) {
-		cout << "er" << endl;
-	}
-*/
 	if(col!=row){
 		while(row>0){
-			out.push_back('x');
+			out.push_back(toupper(read[row-1]));
+			rout.push_back('i');
 			outPos++;
 			row--;
 			col--;
@@ -1545,17 +1459,14 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 	}
 
 	reverse(out.begin(),out.end());
-
+	reverse(rout.begin(),rout.end());
+	cout << out << endl;
+	cout << rout << endl;
 
 	r.precise_start = r.start-MARIC_PADDING + col;
 	r.precise_stop = r.stop+MARIC_PADDING -addon;
 
 	if(gaps==0){
-		/*for(unsigned int j = 0; j < out.size(); j++) {
-			cout << out[j];
-		}
-		cout << "\n";
-*/
 		r.matchString = out;
 		return;
 	}
@@ -1575,17 +1486,124 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 		}
 	}
 	r.matchString = out3;
-/*
-	for(unsigned int j = 0; j < out3.size(); j++) {
-		cout << out3[j];
-	}
-	cout << "\n";
+	return;
+}
 */
+
+void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int row, int col, int state, Result &r, vector<vector<vector<long> > > &packed) {
+
+	long outPos=0;
+	long gaps=0;
+
+	long addon = refEndLoc - col;
+
+	string out;
+
+	while(row>0 && col>0){
+
+		long time=packed[state][row][col]&TIMEMASK;
+		long prev;
+
+		if(state==MODE_MS){
+			if(time>1){prev=(long)state;}
+			else{
+				long scoreFromDiag=packed[MODE_MS][row-1][col-1]&SCOREMASK;
+				long scoreFromDel=packed[MODE_DEL][row-1][col-1]&SCOREMASK;
+				long scoreFromIns=packed[MODE_INS][row-1][col-1]&SCOREMASK;
+				if(scoreFromDiag>=scoreFromDel && scoreFromDiag>=scoreFromIns){prev=MODE_MS;}
+				else if(scoreFromDel>=scoreFromIns){prev=MODE_DEL;}
+				else{prev=MODE_INS;}
+			}
+
+			char c=toupper(read[row-1]);
+			char r=toupper(ref[refStartLoc+col-1]);
+			if(c==r){
+				out.push_back('m');
+			}else{
+				out.push_back('s');
+			}
+			row--;
+			col--;
+		}else if(state==MODE_DEL){
+			if(time>1){prev=(long)state;}
+			else{
+				long scoreFromDiag=packed[MODE_MS][row][col-1]&SCOREMASK;
+				long scoreFromDel=packed[MODE_DEL][row][col-1]&SCOREMASK;
+				if(scoreFromDiag>=scoreFromDel){prev=MODE_MS;}
+				else{prev=MODE_DEL;}
+			}
+
+			char r=toupper(ref[refStartLoc+col-1]);
+			if(r==GAPC){
+				out.push_back('-');
+				gaps++;
+			}else{
+				out.push_back('d');
+			}
+			col--;
+		}else{
+			if(time>1){prev=(long)state;}
+			else{
+				long scoreFromDiag=packed[MODE_MS][row-1][col]&SCOREMASK;
+				long scoreFromIns=packed[MODE_INS][row-1][col]&SCOREMASK;
+				if(scoreFromDiag>=scoreFromIns){prev=MODE_MS;}
+				else{prev=MODE_INS;}
+			}
+
+			if(col==0){
+				out.push_back('x');
+			}else{
+				out.push_back('i');
+			}
+			row--;
+		}
+
+		state=prev;
+		outPos++;
+	}
+
+	if(col!=row){
+		while(row>0){
+			out.push_back('x');
+			outPos++;
+			row--;
+			col--;
+		}
+		if(col>0){
+			//do nothing
+		}
+	}
+
+	reverse(out.begin(),out.end());
+
+	r.precise_start = r.start-MARIC_PADDING + col;
+	r.precise_stop = r.stop+MARIC_PADDING -addon;
+
+	if(gaps==0){
+		r.matchString = out;
+		return;
+	}
+
+	string out3;
+	int j = 0;
+	for(unsigned int i=0; i<out.size(); i++){
+		char c=out[i];
+		if(c!=GAPC){
+			out3.push_back(c);
+			j++;
+		}else{
+			int lim=j+GAPLEN;
+			for(; j<lim; j++){
+				out3.push_back('d');
+			}
+		}
+	}
+	r.matchString = out3;
 	return;
 }
 
 
-void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int score, vector<int> &gaps, int max[], Result &r) {
+void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int score, vector<int> &gaps, long max[], Result &r) {
 	string gref;
 	int grefLimit = (refEndLoc - refStartLoc) + 2 * MARIC_PADDING;
 	bool gapped = true;
@@ -1596,75 +1614,36 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 		}
 	}
 	else {
-		/*for(int i = 0; i < gaps.size(); i++) {
-			cout << gaps[i] << " ";
-		}
-		cout << endl;*/
 		grefLimit = makeGref(ref, gaps, (refStartLoc - MARIC_PADDING), (refEndLoc + MARIC_PADDING), gref);
 	}
-	//cout << gref << endl;
+
 	int rows = read.size();
 	int columns = grefLimit+1;
-	vector<vector<vector<int> > > packed;
-	/*int ***packed;
-	packed = new int**[3];
-	for(int j = 0; j < 3; j++) {
-		packed[j] = new int*[rows+1];
-		for(int i = 0; i < rows+1; ++i) {
-			packed[j][i] = new int[columns+1];
-		}
-	}*/
-
+	vector<vector<vector<long> > > packed;
 
 	for(int matrix=0; matrix<3; matrix++){
-		vector<int> row;
+		vector<long> row;
 		for(int i = 0; i <= columns; i++) {
 			row.push_back(0);
 		}
-		vector<vector<int> > mat;
+		vector<vector<long> > mat;
 		mat.push_back(row);
 		for(int i=1; i<=rows; i++){
-			vector<int> row;
+			vector<long> row;
 			for(int j=0; j<columns+1; j++){
-				//packed[matrix][i][j]=BADoff;
 				row.push_back(BADoff);
 			}
 			mat.push_back(row);
 		}
 		for(int i=0; i<=rows; i++){
-
 			int prevScore=(i<2 ? 0 : mat[i-1][0]);
 			int score=prevScore+POINTSoff_INS_ARRAY[i];
-
 			mat[i][0]=score;
 		}
 		packed.push_back(mat);
 	}
-/*
-	for(int matrix=0; matrix<3; matrix++){
-		vector<int> row;
-		for(int i = 0; i <= columns; i++) {
-			packed[matrix][0][i] = 0;
-		}
-		for(int i=1; i<=rows; i++){
-			for(int j=0; j<columns+1; j++){
-				packed[matrix][i][j]=BADoff;
 
-			}
-
-		}
-		for(int i=0; i<=rows; i++){
-
-			int prevScore=(i<2 ? 0 : packed[matrix][i-1][0]);
-			int score=prevScore+POINTSoff_INS_ARRAY[i];
-
-			packed[matrix][i][0]=score;
-		}
-	}
-*/
-	fillUnlimited(read, gref, 0, grefLimit, max, packed);
-
-	ofstream test("tmp3/test.out");
+	ofstream test("tmp3/test1.out");
 	for(unsigned int i = 0; i < packed[0].size(); i++) {
 		for(unsigned int j = 0; j < packed[0][i].size(); j++) {
 			test << packed[0][i][j] << " ";
@@ -1672,41 +1651,17 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 		test << endl;
 	}
 
-	//string out;
-	//cout << gref << endl;
-	/*for(int i = 0; i < rows+1; i++) {
-		for(int j = 0; j < columns+1; j++) {
-			cout << packed[0][i][j] << " ";
-		}
-		cout << endl;
-	}*/
-	//cout << endl;
+	fillUnlimited(read, gref, 0, grefLimit, max, packed);
+
 	traceback(read, gref, 0, grefLimit, max[0], max[1], max[2], r, packed);
 
 	if(r.gapArray.size() == 0) r.precise_stop--;
-/*
-	for(int i = 0; i < rows+1; i++) {
-		for(int j = 0; j < columns+1; j++) {
-			cout << packed[0][i][j] << " ";
-		}
-		cout << endl;
-	}
-*/
-/*
-	for(int j = 0; j < 3; j++) {
-		for(int i = 0; i < rows+1; i++) {
-			delete [] packed[j][i];
-		}
-		delete [] packed[j];
-	}
-	delete [] packed;
-	*/
+
 }
 
 void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, Result &r, string &whole_genome, int threadId) {
 
 	if(ss.perfect) {
-		//r.matchString = "mmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmmm";
 		r.start = ss.start;
 		r.stop = ss.stop;
 		r.precise_start = r.start;
@@ -1729,7 +1684,7 @@ void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, 
 		return;
 	}
 
-	int max[4];
+	long max[4];
 	fillLimited(read, whole_genome, ss.start, ss.stop, score, ss.gapArray, max, r);
 }
 
@@ -1743,9 +1698,6 @@ void makeMatchString(vector<SiteScore> &results, string &read, string &read_reve
 			SiteScore ress = results[i];
 			ss = results[i];
 		}
-		/*if(results[i].stop == 144497458) {
-			ss = results[i];
-		}*/
 	}
 	Result r = Result(br, ss.start, ss.stop);
 	r.gapArray = ss.gapArray;
@@ -1754,7 +1706,6 @@ void makeMatchString(vector<SiteScore> &results, string &read, string &read_reve
 		makeMatchStringForSite(ss, read, sizes, sites, r, whole_genome, threadId);
 	}
 	else {
-		//cout << read_reverse << endl;
 		makeMatchStringForSite(ss, read_reverse, sizes, sites, r, whole_genome, threadId);
 	}
 	resultsFinal.push_back(r);
@@ -1774,17 +1725,6 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 	vector<int> stops;
 	int get_hits = getHits(keys, MAX_LEN, starts, stops, sizes);
 
-	/*for(unsigned int i = 0; i < starts.size(); i++) {
-		for(unsigned int j = starts[i]; j < stops[i]; j++) {
-			cout << sites[j] << " ";
-		}
-	}
-	cout << endl;*/
-	/*for(unsigned int i = 0; i < stops.size(); i++) {
-		cout << stops[i] << " ";
-	}
-	cout << endl;
-*/
 	bool filter_by_qscore = (get_hits >= 5);
 	int minScore = (int) (MIN_SCORE_MULT * max_score);
 	int minQuickScore = (int)(MIN_QSCORE_MULT * max_quick_score);
@@ -1824,21 +1764,14 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 
 		heap.add(t);
 	}
-	if(write_output) cout << "\n";
 
 	vector<int> loc_array;
 	SiteScore prevSS;
 
 	int numberOfSites = 0;
 
-
-
 	while(!heap.isEmpty()) {
 		Triplet t = heap.peek();
-		//cout << "left: " << t.site << endl;
-		/*for(unsigned int i = 0; i < heap.array.size(); i++) {
-			cout << heap.array[i].site << endl;
-		}*/
 		int site = t.site;
 		int center_index = t.column;
 		int max_nearby_site = site;
@@ -1920,9 +1853,6 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 				int site2 = mapStart;
 				int site3 = mapStop + read.size() - 1;
 
-				//cout << "start: " << site2 << ", stop: " << site3 << ", size: " << (site3-site2) << endl;
-				//cout << "score: " << score << endl;
-				//cout << "strand: " << strand << endl;
 				vector<int> gapArray;
 				if(site3-site2 >= MINGAP + (int)read.size()){
 
@@ -1936,7 +1866,6 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 				SiteScore ss;
 				bool perfect1 = score == max_score && fully_defined;
 				bool inbounds = (site2 >= 0 && site3 < (int)whole_genome.size());
-				//cout << "perfect1: " << perfect1 << ", max_score: " << max_score << " fully_defined: " << fully_defined << endl;
 
 				if(inbounds && (int) gapArray.size() == 0 && isNull(prevSS) == false
 						&& strand == prevSS.strand && overlap(prevSS.start, prevSS.stop, site2, site3)){
@@ -1986,19 +1915,11 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 						//prevSS.setPerfect(bases); TODO add perfect set
 					}else{
 						ss = SiteScore(site2, site3, score, approx_hits, perfect1, strand, gapArray);
-						//cout << "first: start: " << site2 << ", stop: " << site3 << "\n";
-						//cout << "length: " << (site3 - site2) << endl;
-						//cout << "score: " << score << endl;
-						//cout << "size of results: " << results.size() << endl;
 						//if(!perfect1){ss.setPerfect(bases);} TODO add perfect set
 					}
 
 				}else if(inbounds){
 					ss = SiteScore(site2, site3, score, approx_hits, perfect1, strand, gapArray);
-					//cout << "second: start: " << site2 << ", stop: " << site3 << "\n";
-					//cout << "length: " << (site3 - site2) << endl;
-					//cout << "score: " << score << endl;
-					//cout << "size of results: " << results.size() << endl;
 					//if(!perfect1){ss.setPerfect(bases);} TODO add perfect setter
 				}
 
@@ -2033,10 +1954,6 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 				heap.add(t2);
 			}
 			else if(heap.size() < approx_hits_cutoff){
-				/*cout << "--------------" << endl;
-				for(unsigned int i = 0; i < results.size(); i++) {
-					cout << "start: " << results[i].start << ", stop: " << results[i].stop << endl;
-				}*/
 				return;
 			}
 		}
@@ -2045,22 +1962,9 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 
 void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFinal, string &whole_genome, int threadId, int br) {
 
-	//cout << " " << br << " ";
-
 	int split_size = r1.size() / split_count;
 	for(int i = 0; i < split_count; i++) {
-		/*string read;
-		if(i == 3) {
-			read = r1.substr(1450,550);
-		}
-		else {
-			read = r1.substr(i * 500,500);
-		}*/
 		string read = r1.substr(i * split_size, split_size);
-	/*	string r2 = read.substr(500,500);
-		string r3 = read.substr(1000,500);
-		string r4 = read.substr(1500,500);*/
-
 		string read_reverse;
 		reverseComplementRead(read_reverse, read);
 
@@ -2102,24 +2006,18 @@ void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFina
 		vector<int> keys_reversed;
 		reverseComplementKeys(keys_reversed, read_keys_final, KEYLEN);
 
-		//cout << "Read: " << br << " prepared." << endl;
-
 		if(prescan_qscore){
 			vector<vector<int> > prescanResults;
 			prescanAllBlocks(prescanResults, bestScores, read_keys_final, offsets,
 					keys_reversed, offsets_reversed, pretend_all_bases_covered, sizes, sites);
 
-			//cout << "Read: " << br << "prescan all blocks. " << endl;
-
 			precounts=prescanResults[0];
 			prescores=prescanResults[1];
 
 			if(bestScores[1]<MIN_APPROX_HITS_TO_KEEP) {
-				//cout << "best scores: " << bestScores[1] << endl;
 				return;
 			}
 			if(bestScores[3]<quick_max_score*MIN_QSCORE_MULT2) {
-				//cout << "best scores3: " << bestScores[3] << endl;
 				return;
 			} //if(bestScores[3]<maxQuickScore(offsetsP, keyScoresP)*.10f){return result;}
 
@@ -2138,26 +2036,12 @@ void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFina
 
 		bool fully_defined = isFullyDefined(read);
 
-		//cout << "Read: " << br << " prescaned." << endl;
-
-	//	cout << "precounts[0]: " << precounts[0] << endl;
-	//	cout << "prescores[0]: " << prescores[0] << endl;
-	//	cout << "precounts[1]: " << precounts[1] << endl;
-	//	cout << "prescores[1]: " << prescores[1] << endl;
-
 		if(precounts[0] >= hitsCutoff && prescores[0] >= qscoreCutoff) {
 			align(bestScores, read_keys_final, read, offsets, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 0, whole_genome);
 		}
 		if(precounts[1] >= hitsCutoff && prescores[1] >= qscoreCutoff) {
 			align(bestScores, keys_reversed, read_reverse, offsets_reversed, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 1, whole_genome);
 		}
-
-		//cout << "Read: " << br << " aligned." << endl;
-	/*
-		for(unsigned int i = 0; i < results.size(); i++) {
-			cout << "start: " << results[i].start << ", stop: " << results[i].stop << endl;
-		}
-	*/
 
 		if(results.size() != 0) {
 			makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br);
@@ -2199,7 +2083,6 @@ void writeResults(vector<vector<Result> > &set_of_results, map<int, Result> corr
 		map<int, Result>::iterator pos = correct_results.find(r.br);
 		Result r2 = pos->second;
 		out_res << r.br << "-" << r.start << "-" << r.stop << "-" << (r.stop-r.start) << endl;
-		//out_res << r.precise_start << "-" << r.precise_stop << endl;
 		out_res << r2.br << "-" << r2.start << "-" << r2.stop << "-" << (r2.stop-r2.start) << endl;
 		out_res << r.matchString << endl;
 		br++;
@@ -2246,6 +2129,15 @@ int calculateOverlap(int start1, int stop1, int start2, int stop2) {
 
 void calculateStatistics2(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
 	int sum = 0;
+	/*for(unsigned int i = 0; i < r1.gapArray.size(); i++) {
+		cout << r1.gapArray[i] << " ";
+	}
+	cout << endl;
+	for(unsigned int i = 0; i < r2.gapArray.size(); i++) {
+		cout << r2.gapArray[i] << " ";
+	}
+	cout << endl;
+	*/
 	if(r1.gapArray.size() == 0) {
 		r1.gapArray.push_back(r1.start);
 		r1.gapArray.push_back(r1.stop);
@@ -2255,28 +2147,15 @@ void calculateStatistics2(Result &r1, Result &r2, ofstream &out_stat, Statistic 
 			if(overlap(r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1])) {
 				int tmp = calculateOverlap(r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1]);
 				sum += tmp;
-				//out_stat << r1.gapArray[j] << "-" << r1.gapArray[j+1] << "  " << r2.gapArray[i] << "-" << r2.gapArray[i+1] << " (" << tmp << ")" << endl;
 			}
 		}
 	}
-	//out_stat << "bases overlap: " << sum << endl;
-	/*for(unsigned int i = 0;  i < r1.gapArray.size(); i++) {
-		out_stat << r1.gapArray[i] << " ";
-	}
-	out_stat << endl;
-	for(unsigned int i = 0;  i < r2.gapArray.size(); i++) {
-		out_stat << r2.gapArray[i] << " ";
-	}*/
-//	out_stat << endl;
 	statistics.covered += sum;
 
 }
 
 void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
-/*
-	if(r1.br == 26) {
-		cout << "ere" << endl;
-	}*/
+
 	statistics.reads_with_result++;
 	if(r2.gapArray.size() > 2) {
 		for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
@@ -2348,12 +2227,9 @@ void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &
 
 void writeStatistics(vector<vector<Result> > &set_of_results, map<int, Result> &correct_results, string infile, Statistic &statistic) {
 	ofstream out_stat(infile.c_str());
-	//Statistic statistic = Statistic();
-	//cout << "number: " << results.size();
 	for(unsigned int j = 0; j < set_of_results.size(); j++) {
 		vector<Result> results = set_of_results[j];
 		for(unsigned int i = 0; i < results.size(); i++) {
-			/*if(results[i].br % 100 == 0) */ //cout << "stat: " << results[i].br << endl;
 			Result r1 = results[i];
 			map<int, Result>::iterator pos = correct_results.find(r1.br);
 			Result r2 = pos->second;
@@ -2416,16 +2292,9 @@ void *preProcessRead(void *threadid) {
 	for(int i = td->start; i < td->stop; i++) {
 
 		string read = (*(td->reads))[i];
-		/*string r1 = read.substr(0,500);
-		string r2 = read.substr(500,500);
-		string r3 = read.substr(1000,500);
-		string r4 = read.substr(1500,500);*/
 
 		if((i+1)%100 == 0) cout << "Read: " << i+1 << " started." << endl;
 		processRead(td->sizes, td->sites, read, *(td->results), *(td->whole_genome),  td->thread_id, i+1);
-		/*processRead(td->sizes, td->sites, r1, *(td->results), *(td->whole_genome),  td->thread_id, i+1);
-		processRead(td->sizes, td->sites, r1, *(td->results), *(td->whole_genome),  td->thread_id, i+1);
-		processRead(td->sizes, td->sites, r1, *(td->results), *(td->whole_genome),  td->thread_id, i+1);*/
 	}
 	pthread_exit(NULL);
 }
@@ -2433,7 +2302,7 @@ void *preProcessRead(void *threadid) {
 void checkParameter(string command, string value) {
 	if(strcmp(command.c_str(), "-t") == 0) {
 			thread_num = atoi(value.c_str());
-			cout << "Number of threads se to " << thread_num << "." << endl;
+			cout << "Number of threads set to " << thread_num << "." << endl;
 		}
 		else if(strcmp(command.c_str(), "-i") == 0) {
 			index_location = value;
@@ -2464,6 +2333,45 @@ void checkParameter(string command, string value) {
 		}
 }
 
+int main2(int argc, char *argv[]) {
+
+	string read = "GTTAAAGCCCCAGACGTCAAAGCCATCCCGGTTGTGAATCCTTGTTTGAGAGCCTCTCCCTTCGCTCATGCTGTGTGGATCTTGAGACACCTCATCTCCCAGATGATTGTTTTGAACCTATATATTTTACCATTCTCAATGATCAAATGTAGCGCTTGAGATGGACTTACTGCTCGCTCTGCCGCATGCTGGGTTTCTTTCTAGACCCCTCTTCCTCCTGTCACCTGGGACAGCATGTGGGTTGGCAGAGGCCGATAAAGAAGCCCCGAAACTCAAATGAAAGGTCATCAGGTCCAGAGCTACCTATTAGCTTAAATTTGATCCGGTAGGAGACAAGGTGCTTAAGAGGGATAGACCTATGGGCGGAGGAAACAGCCGGAAGAAGAGAATTAAGAGACCCTCGATGAAATTTTAAATATTTAAAAAAATAAAAGTTACTGGGAAGGTGGTTAATAGAAACAGACGATTAGCGACCCAACTAGAAAGCTACACAGGTGTTCGACGAGAGAAATTGAGGGGCTGTAAGCCTAAGGATTGAATTCTAAAGATACAATGGAAAAGGGAGTATGAAGGCACACCAGGGCCTTGCGGACATCTCCTTACCTTCATTCCAGCATGAAGGAGGAGAAGGGCAGGGAGGTAGGGAGCATTTCAGCAGAGCCAGCACCAGCTTTGATAATCTCCCCCAGCTACCCTATTTAAGGAGTTCGAGGTTTAAGAGTTTAAAAACAGGTGGCACCGAGACCCCAATTCAGGAGACAGTAGGTTACTCCGGGTTCGAAGAGAAATCCTATCTGAGGCCTGTTGGCTTCCCGGGCTTCAGCAGAGACCCTCTAGGGAACCAGTAGTCACTTGATCAGTCCTGATGCCTTGACCCAATCGCCGAGAGTCGCTAAGGCTAGAGGTATTTGAGGGAGTCGAGCCCCCAAGCCTCGTGTGGCACTAATAGGCAGTTATAGAAAAGGCGGGTCCTAAGATCATTGGTGTTAGGCGGGATCGGGTAGGGGGAGCATGTCTTCTGTGCTGGAAACAGAAGGGGTATTTCAAGATGGCAGACCCATTCAATTATTGGAGCTATAAGCTCCTAGAATTGCTCGATGGGCTATCTCGGTTTCCCTTGCATCACATCTGCGCCTGAACTGCACCTGTCATGGCGGGTCCATCTTCGTCCCCGATCTCCCGTTAGTCAATCGATGTCCGCTGAACAAAATTCATTGGTGCCCCAATCACGTTCCGGTCAATCCCGCGTCTCTTCTTCCTCGGCTGGGGTTTTTCTACCACACAGCAGCGTAGTTTATGCCGAAATTCACTCTTGCTCCCTGATGGTTCCAGCTTCACGCAACTGTCTGAAGGCCCTCAGGGCTCTTTCGCTTGTGTCTGTACAACCCCCTCCACGCTCTCCCCAGATAGACCACCACCCTGGGTTCACTCATCTTCATGGGTCGTGACGGCGTGGAATGCCTGGAACCATTAACTGAGCAGTAAAGGTCAGTGGCACATAGCCCAAGAGATGAACAGGACCAGAGACAGAGGGGGGCAGGAACTCACAAGGTTATGTCTTCCTAAGAATCGGAACCCTGTCCGTGAATTCCTTCCTGAAACCTGTGTTCATTCGGTCTAGCTGTGTCCTATATAACTGAACTCTTGTGAGTACACCCCTGTGCGCACATCCGTGGCATGGCCACCTCTTCACGTATCTCCAGTACAGATGATCTATGTACAAGTTATACGTACTTGTGACAGATTTCTTCTGTCCCATGAGCAACGTTTTCCCCATCGTCCACATGTCCTATCAGTCAATGTGGTCTGACGCCCACCCTATACAGCCCAGGCGTCCCTCGCGTTGTGACCTGTGCTGCGCTCCCGCCTCACCAATTCTATGCACAAGCTTCATCAGTGAATCAGACGTAAGGAAATCTCCTAGAGTACTAGTGTCCAAGAAATAACTTCCTCCCTTCTCACTACTGCCAGCGAGGGTGGGACACATCCGGGTTTCATCT";
+	string gref = "aagaacacttcagcccaaaatgtcaaaggcatctcggttgtgaaaccttgTTCTAGAGCCTCTCCCTGCTCCCGTGCTGTGAGGATCTTAAGACTCCTAAACTCACAGATGATTGTTTTCAACCTATTTATCTCACCATCCTCAATGATCAGAAGTCCACCTTGAGATGGACTTACTCCTAGTTCTGCCGCATTCTGGGTTTCTTTCCAGACCCCTCTTCCTCCTCTCACCTGGGCCAGCAGGGAGGTTGGCAGAGGGCAGGAAAGATGCCCCAAAACTTAAATGGAATGTCATCAGGTGAAGAGCTACCTCTTACCTTAACTCTTATTCGGTGGGAAACAAGGTTCCTAATAGGGATAGAGTTAAGGGCGGAGGCAACAGCAGGATGAGGATAATTAAGAGAACCTGaattaaatttttaatattttaaaaaaGGAAAGTTGCTGGGAAGCTGGTAAACAGAAACAGAAGATTAGAGGCCTAACTAGAAAGAGACACTGGTGTTAGCAGAGAGATATTGAGGGGCTGTAAGCCTAAGGTTTGAAATCTAAAGATAGAGTGGAAAAGGGAGTAGGCACCCCCACCAGCCCCTGCTTGACATCTGCTTTAGTTCATTCCAGCAGGAAGGAGGAGAAGGGCAGGGAGGTAGGGAGCTTCTCAGCAAAGCCAGCTTCAGCTTTGATAATCTCACCCACCTACCCCATTTAAGGAGTTCCAGGTTTAAGAGTTTAAAAACAGGTGGCACCCAGACCATCATTCAGGAGACAGGAACTCATTCCAGGTTCCTAGAGAACTCCTATCTCAGACCTGAGGGTTTCCAGGGCTTCAGCTGAGCTCCTCTGGCTAACCAGTAGTCACTTGATCAGTCCTGCTGCCTTGACCCCATCTCCAGGAGGGGCTATGGCCAGAGGGAGTAGAGGGAGTCCAGCCCCCAAGCCTTGTGAGGCACTGTTAGGCAGATAGGGAAAAGAGGGGTCCTTAGATCACTGGTTCAAGGAGGGATCTGGTAGGGGCAGCATTTCTTCTGGGCTGGAAACAGAATGGGGGTTTCAAGATGGCAGAACCTGAAATAAAAAAAAAGTTTTTCTTAAAGAAGATTAGCCTCAAAGAAAACCAAGGCTTTAGGAAGAAGGCACTACCTAGTGCAGACTTTAAGCTATTTCCACAGTGTGTTCTTTA------GGGTTTCTCTAATCACTCACCATTCCATTATTGGAGCTATAAGCCCCTAGAATTGCTCCATGGCCTATCTCGGTTTCCCTTGGATCTCATCTGCTCCTGAACTGCACCTGTCTGTAAAAAAACAGATGCGAGACACCTTCGTAAGTCTTCATATCCTACAGTAAGAACTCTACTTTGTGCCTTCCAGGGAAGAGGCTGACGCCATCTCCTTGACAATAGCAGCCATCTGCTAACCACCATTCCTCCTAGGGGAGTCTCAATGCCTCTTTTCACACTGGCCT----TTTCCTTGTTACCATGGCAAGTCCATCTCCGGCCCCCATCTCCCCTGAGCCAATGTGAGTCAGGTGAACAAAATTCATTGGTTCCCCAATCATGGTCCGGTCAATCCGTCTTCTCTTCTTCTTCTGCTTGGAGAAGATAAGGAGTCATGTCTTAAGGCCCCTCCTCCAGTCAGCACGGAGGAAGGGAAAAGAGTCTTCAAAACCACTGAAAAGCTAAGGGCCTGGTGGGAAGAGGGGATGTGGCATTTTAACAGGGAAATCACTAGGGCATGAAAGGCAAA---AGACTCACCGGCTGGGGTTTCTCTACCACACAGCAGCCCAGTTTGTGCCAAAATTCACTCATGTTCCCTGATGGTTCCAGCTTCACTCCGCTGTCTGAGGCCCCAAAGGGCTCTTTCCCTGGTGTTTGGACAACCCACTCCTCACTCTCCCCAGATACACCACCACCCTGGGTTCACTCAGCTGGATGGGTCCAGACAAAGTGGAATCCCTGGAACCTTTAACTGAGCAGTGAAGGTCAGTGTCTCAGAGCCTGAGAGATGAACAGGACCAGAGAGAGAGGTGGGCAGGCAGGCACAAGGTTATGTCTTCCTCAGACTCGGAACCCTGGATTAGAAGAAAGTAAAAAGAAAGATCAGTGAGAAATCTCCCCCTCCCCCAATCCTTGAGAAACCTCCTGATGAGCCTATATCTTCCCAGTCCTCCCTGAGAGGCCCTAGACCTGTACACCAACACTCATTCCCAAACACTATGAACCTCAGTTTGACTCTAAAAAAAAGGAACAGAACCAAAAGGACACCAAGGGGTTAAGGAGCAGTGGCTGGTGGTACCAAGGGAGAGGAAGGGGGCTAGAAGCACTTAGAGTTAAGAGGATGGGCGAGGACCAA----CTGTGTACAGGTTGTGGGTACATGTGCCAGGTATCTTCTGTCCCATGAGGAATATTTTCCCCACCGTCCACATGTCCTATCTGCCACTCTGCTCTGCCTCACACCCTATAGGGCCCAGGCTCCCCTCCAGCTGTGACCTGTTCTCCCCTCCCTCCTCACCAATTCTATCCTCAAGCTTCATCAGTGAACCAGACATAAGGAACTTTCCAATAGTACTAGTGTCCAAGGAAGAACTTCCTCCCTTCTCACTACTGCCAGCCAGGGTAGGACACATCTGGGTTTCTTCTTAGACT";
+	int grefLimit = 2657;
+	long max[4];
+
+	int rows = read.size();
+	int columns = grefLimit+1;
+	vector<vector<vector<long> > > packed;
+
+	for(int matrix=0; matrix<3; matrix++){
+		vector<long> row;
+		for(int i = 0; i <= columns; i++) {
+			row.push_back(0);
+		}
+		vector<vector<long> > mat;
+		mat.push_back(row);
+		for(int i=1; i<=rows; i++){
+			vector<long> row;
+			for(int j=0; j<columns+1; j++){
+				row.push_back(BADoff);
+			}
+			mat.push_back(row);
+		}
+		for(int i=0; i<=rows; i++){
+			int prevScore=(i<2 ? 0 : mat[i-1][0]);
+			int score=prevScore+POINTSoff_INS_ARRAY[i];
+			mat[i][0]=score;
+		}
+		packed.push_back(mat);
+	}
+
+	fillUnlimited(read, gref, 0, grefLimit, max, packed);
+	Result r(0,0,0);
+
+	traceback(read, gref, 0, grefLimit, max[0], max[1], max[2], r, packed);
+}
+
 int main(int argc, char *argv[]) {
 
 	if(argc != 4 && argc != 6 && argc != 8 && argc != 10) {
@@ -2471,9 +2379,6 @@ int main(int argc, char *argv[]) {
 		cout << "<destination_folder> - folder where results will be stored." << endl;
 		cout << "<reads_file> - file with reads in fasta format." << endl;
 		cout << "<genome_reference_file> - file with regerence genome." << endl;
-		//cout << "<create_index> - 0 if index was created before, 1 if you want to create an index for this run." << endl;
-		//cout << "<reults_file> - file where resulting alignments will be stored." << endl;
-		//cout << "<statistics_file> - file where statistics will be stored." << endl;
 		cout << "-t <thread_number> - Optional parameter. Number of threads, default 4." << endl;
 		cout << "-k <KEYLEN> - Optional parameter. Length of the key. Default 13." << endl;
 		cout << "-b <build_number> - Optional parameter. Build number of the index. By default set to 1." << endl;
@@ -2491,12 +2396,10 @@ int main(int argc, char *argv[]) {
 	if (stat(argv[1], &sb) == 0 && S_ISDIR(sb.st_mode)) {
 		outdir = argv[1];
 		cout << "Results will be stored in '" << outdir << "'." << endl;
-		//exit(0);
 	}
 	else {
 		outdir = argv[1];
 		const string out = "mkdir -p " + outdir;
-		//cout << out << endl;
 		if(system(out.c_str())) {
 			cout << "Unable to create directory '" << outdir << "'." << endl;
 			exit(-1);
@@ -2504,7 +2407,6 @@ int main(int argc, char *argv[]) {
 		else {
 			cout << "Directory '" << outdir << "' created." << endl;
 			cout << "Results will be stored in '" << outdir << "'." << endl;
-		//	exit(0);
 		}
 	}
 
@@ -2534,7 +2436,6 @@ int main(int argc, char *argv[]) {
 		string build = SSTR(build_number);
 		string sizes_location = index_location + "//sizes" + build;
 		string sites_location = index_location + "//sites" + build;
-		//cout << sites_location << endl;
 		string info_location = index_location + "//index" + build + ".info";
 		pFile = fopen( sizes_location.c_str() , "rb" );
 		pFile2 = fopen(sites_location.c_str(), "rb");
@@ -2545,27 +2446,20 @@ int main(int argc, char *argv[]) {
 			cout << "Index will be created at location '" << index_location << "'." << endl;
 			read_index = false;
 		}
-		else {
-			/*string line
-			ifstream index_info(info_location.c_str());
-			vector<string> elems;
-			while(getline(index_info, line)) {
-				split(line, ':', elems);
-				if()
-			}*/
-		}
 		if(pFile) {
 			fclose(pFile);
 		}
 		if(pFile2) {
 			fclose(pFile2);
 		}
+		if(pFile3) {
+			fclose(pFile3);
+		}
 	}
 	else {
 		cout << "Directory '" << index_location << "' does not exist." << endl;
 		read_index = false;
 		const string out = "mkdir -p " + index_location;
-		//cout << out << endl;
 		if(system(out.c_str())) {
 			cout << "Unable to create directory '" << index_location << "'." << endl;
 			exit(-1);
@@ -2573,7 +2467,6 @@ int main(int argc, char *argv[]) {
 		else {
 			cout << "Directory '" << index_location << "' created." << endl;
 			cout << "Index will be stored in '" << index_location << "'." << endl;
-		//	exit(0);
 		}
 	}
 
@@ -2617,7 +2510,6 @@ int main(int argc, char *argv[]) {
 	pthread_attr_init(&attr);
 	pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 
-	//vector<Result> results;
 	vector<vector<Result> > set_of_results;
 	for(int i = 0; i < thread_num; i++) {
 		vector<Result> tmp;
@@ -2629,7 +2521,6 @@ int main(int argc, char *argv[]) {
 	for(int i = 0; i < thread_num; i++) {
 		int start =  i*difference;
 		int stop =  i*difference + difference;
-		//cout << "thread: " << i << " " << start << "-" << stop << endl;
 		datas3[i] = ThreadData3(i, sizes, sites, &reads, start, stop, &whole_genome, &set_of_results[i]);
 	}
 	datas3[thread_num-1].stop = reads.size();
@@ -2648,11 +2539,7 @@ int main(int argc, char *argv[]) {
 		cout << "Main: completed thread id :" << i ;
 		cout << "  exiting with status :" << status << endl;
 	}
-/*
-	for(unsigned int i = 0; i < reads.size(); i++) {
-		//cout << (i+1) << "------------------- \n";
-		processRead(sizes, sites, reads[i], results, whole_genome);
-	}*/
+
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
 	long endday2 = t2.tv_usec;
@@ -2695,8 +2582,11 @@ int main(int argc, char *argv[]) {
 	delete [] res;
 
 	cout << "Program ended." << endl;
-
-
+/*
+	cout << std::numeric_limits<int>::max() << endl;
+	cout << std::numeric_limits<long>::max() << endl;
+	cout << std::numeric_limits<ulong>::max() << endl;
+*/
 	return 0;
 }
 
