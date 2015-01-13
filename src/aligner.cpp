@@ -80,6 +80,14 @@ struct Result {
 	}
 };
 
+struct FastaRead {
+	string name;
+	string read;
+	FastaRead(string name_, string read_) {
+		name = name_;
+		read = read_;
+	}
+};
 
 struct ThreadData3 {
 	int thread_id;
@@ -161,7 +169,29 @@ void gapArrayFromString(vector<int> &gapArray, string str) {
 	}
 }
 
-void readReads(vector<string> &reads, map<int, Result> &results, string infile) {
+void readFastaReads(vector<string> &reads, string infile, map<int, FastaRead> fastaReads) {
+	ifstream ifs(infile.c_str());
+	if(!ifs) {
+		cout << "File " << infile << " does not exist." << endl;
+		exit(-1);
+	}
+	string line;
+	string line2;
+	int br = 1;
+	while(getline(ifs, line)) {
+		getline(ifs, line2);
+		reads.push_back(line2);
+		string first = line.substr(2, line.size()-2);
+		string second = line2;
+		FastaRead fr(first, second);
+		std::map<int,FastaRead>::iterator it = fastaReads.begin();
+		fastaReads.insert(it, pair<int,FastaRead>(br, fr));
+		br++;
+	}
+
+}
+
+void readReads(vector<string> &reads, map<int, FastaRead> &fastaReads, map<int, Result> &results, string infile) {
 	ifstream ifs(infile.c_str());
 	if(!ifs) {
 		cout << "File " << infile << " does not exist." << endl;
@@ -181,6 +211,11 @@ void readReads(vector<string> &reads, map<int, Result> &results, string infile) 
 		getline(ifs, line4);
 		getline(ifs, line5);
 		getline(ifs, line6);
+		string first = SSTR(br);
+		string second = line6;
+		FastaRead fr(first, second);
+		std::map<int,FastaRead>::iterator it2 = fastaReads.begin();
+		fastaReads.insert(it2, pair<int,FastaRead>(br, fr));
 		Result r = Result(br, atoi(line2.c_str()), atoi(line3.c_str()));
 		r.matchString = line4;
 		gapArrayFromString(r.gapArray, line5);
@@ -190,6 +225,207 @@ void readReads(vector<string> &reads, map<int, Result> &results, string infile) 
 		total_base_num += line6.size();
 		br++;
 	}
+}
+
+/*
+ *
+ * FILTER REF
+ *
+ */
+
+void writeNewRef(string file, vector<int> &coverage) {
+
+	ofstream out(file.c_str());
+	vector<int> starts;
+	vector<int> stops;
+	int start = -1;
+	int stop = -1;
+	int pos = -1;
+	for(unsigned int i = 0; i < coverage.size(); i++) {
+		if(coverage[i] > 0) {
+			start = i;
+			stop = i;
+			pos = i;
+			break;
+		}
+	}
+	int sum = 0;
+	for(unsigned int i = pos; i < coverage.size(); i++) {
+		if(coverage[i] > 0) {
+			//sum++;
+			if(stop + 100 > i) {
+				stop = i;
+			}
+			else {
+				starts.push_back(start);
+				stops.push_back(stop + 100);
+				start = i-100;
+				stop = i;
+			}
+			/*int tmp = i - stop;
+
+			if(tmp > 32000) {
+				cout << stop << "-" << i << " " << tmp << endl;
+				sum += tmp;
+			}
+			stop = i;*/
+		}
+	}
+	cout << "sum: " << sum << endl;
+	starts.push_back(start);
+	stops.push_back(stop);
+	for(unsigned int i = 0; i < starts.size(); i++) {
+		out << starts[i] << "-" << stops[i] << /*" " << (stops[i] - starts[i]) << */endl;
+	}
+}
+
+void writeNewRef2(string file, vector<int> &coverage) {
+	int start = 0;
+	int stop = 0;
+	int previous = coverage[0];
+	vector<int> starts;
+	vector<int> stops;
+	for(unsigned int i = 1; i < coverage.size(); i++) {
+		if(coverage[i] != 0 && previous != 0) {
+			stop = i;
+			previous = coverage[i];
+		}
+		else if(coverage[i] != 0 && previous == 0) {
+			start = i;
+			stop = i;
+			previous = coverage[i];
+		}
+		else if(coverage[i] == 0 && previous != 0) {
+			starts.push_back(start);
+			stops.push_back(stop);
+			start = i+1;
+			stop = i+1;
+			previous = coverage[i];
+		}
+		else if(coverage[i] == 0 && previous == 0) {
+			start = i+1;
+			stop = i+1;
+			previous = coverage[i];
+		}
+
+	}
+}
+
+/*
+ *
+ * COVERAGE
+ *
+ */
+
+
+void calculateCoverageFromCig(vector<int> &coverage, string infile) {
+	ifstream res(infile.c_str());
+	string line;
+	string linestr;
+	while(getline(res, line)) {
+		getline(res, line);
+		getline(res, line);
+		getline(res, line);
+		getline(res, line);
+		//linestr = line.substr(0, line.size()-1);
+		vector<int> array;
+		gapArrayFromString(array, linestr);
+		for(unsigned int k = 0; k < array.size(); k+=2) {
+			int start = array[k];
+			int stop = array[k+1];
+			for(int l = start; l <= stop; l++) {
+				coverage[l] = coverage[l]+1;
+			}
+		}
+
+	getline(res, line);
+	}
+}
+
+
+void calculateCoverageFromResults(vector<int> &coverage, string infile) {
+	ifstream res(infile.c_str());
+	string line;
+	string linestr;
+	while(getline(res, line)) {
+		getline(res, line);
+		getline(res, line);
+		linestr = line.substr(0, line.size()-2);
+		vector<int> array;
+		gapArrayFromString(array, linestr);
+		for(unsigned int k = 0; k < array.size(); k+=2) {
+			int start = array[k];
+			int stop = array[k+1];
+			for(int l = start; l <= stop; l++) {
+				coverage[l] = coverage[l]+1;
+			}
+		}
+
+	getline(res, line);
+	}
+}
+
+void calculateCoverage(vector<int> &coverage, vector<vector<Result> > &results) {
+	for(unsigned int i = 0; i < results.size(); i++) {
+		for(unsigned int j = 0; j < results[i].size(); j++) {
+			Result r = results[i][j];
+			if(r.gapArray.size() == 0) {
+				r.gapArray.push_back(r.start);
+				r.gapArray.push_back(r.stop);
+			}
+			if(r.br % 50 == 0) {
+				cout << "read: " << r.br << endl;
+			}
+			/*for(unsigned int f = 0; f < r.gapArray.size(); f+=2) {
+				cout << r.gapArray[f] << "-" << r.gapArray[f+1] << endl;
+			}*/
+			for(unsigned int k = 0; k < r.gapArray.size(); k+=2) {
+				int start = r.gapArray[k];
+				int stop = r.gapArray[k+1];
+				if(stop < start) {
+					cout << "stop je manje od start" << endl;
+				}
+				if(start > coverage.size()) {
+					cout << "start vece od kraja" << endl;
+				}
+				if(stop > coverage.size()) {
+					cout << "stop vece od kraja" << endl;
+				}
+				for(int l = start; l <= stop; l++) {
+					coverage[l] = coverage[l]+1;
+				}
+			}
+		}
+	}
+}
+
+
+void writeCoverage2(string path, vector <int> &coverage) {
+	ofstream outs(path.c_str());
+	for(unsigned int i = 0; i < coverage.size(); i++) {
+	    if(coverage[i] > 1) outs << i << "\t";
+	    if(coverage[i] > 1) outs << coverage[i] << endl;
+	}
+
+}
+
+void writeCoverage(string path, vector <int> &coverage) {
+	ofstream outs(path.c_str());
+	/*for(unsigned int i = 0; i < coverage.size(); i++) {
+	    outs << i << "\t";
+	}
+	outs << endl;*/
+	for(unsigned int i = 0; i < coverage.size(); i++) {
+	    outs << coverage[i] << "\t";
+	}
+	outs << endl;
+}
+
+void checkCoverage(vector<int> &coverage) {
+	for(unsigned int i = 0; i < coverage.size(); i++) {
+	    if(coverage[i] > 0) cout << coverage[i] << " ";
+	}
+	cout << endl;
 }
 
 /*
@@ -2066,7 +2302,72 @@ void sortResults(vector<Result> &results) {
 	}
 }
 
-void writeResults(vector<vector<Result> > &set_of_results, map<int, Result> correct_results, string infile) {
+string compressMatchString(string &matchString) {
+	char current = matchString[0];
+	int number = 1;
+	string compressed;
+	for(unsigned int i = 1; i < matchString.size(); i++) {
+		if(current == matchString[i]) {
+			number++;
+		}
+		else if((current == 'm' && matchString[i] == 's') || (current == 's' && matchString[i] == 'm')) {
+			number++;
+		}
+		else {
+			if(current == 's') current = 'm';
+			compressed += SSTR(number);
+			compressed.push_back(current);
+			number = 1;
+			current = matchString[i];
+		}
+	}
+	if(current == 's') current = 'm';
+	compressed += SSTR(number);
+	compressed.push_back(current);
+	return compressed;
+}
+
+void writeSamResults(vector<vector<Result> > &set_of_results, vector<string> &reads, map<int, FastaRead> &read_names, string infile) {
+	vector<Result> results;
+	for(unsigned int i = 0; i < set_of_results.size(); i++) {
+		for(unsigned int j = 0; j < set_of_results[i].size(); j++) {
+			results.push_back(set_of_results[i][j]);
+		}
+	}
+	cout << "size of results: " << results.size() << endl;
+	sortResults(results);
+	ofstream out_res(infile.c_str());
+	for(unsigned int i = 0; i < results.size(); i++) {
+		Result r = results[i];
+		if(r.gapArray.size() == 0) {
+			r.gapArray.push_back(r.start);
+			r.gapArray.push_back(r.stop);
+		}
+		map<int, FastaRead>::iterator pos = read_names.find(r.br);
+		FastaRead fr = pos->second;
+
+		out_res << (fr.name) << "\t";
+		for(unsigned j = 0; j < r.gapArray.size(); j+=2) {
+			out_res << r.gapArray[j] << "-" << r.gapArray[j+1];
+			if(j+2 != r.gapArray.size()) out_res << ",";
+		}
+		out_res << "\t";
+		out_res << "0\t";
+		out_res << "chr1\t";
+		out_res << r.start << "\t";
+		out_res << "*\t";
+		out_res << compressMatchString(r.matchString) << "\t";
+		out_res << "*\t";
+		out_res << "0\t";
+		out_res << "0\t";
+		out_res << (fr.read) << "\n";
+		out_res << "*\t";
+		out_res << "*\t";
+		out_res << "\n";
+	}
+}
+
+void writeResults(vector<vector<Result> > &set_of_results, map<int, Result> &correct_results, string infile) {
 
 	vector<Result> results;
 	for(unsigned int i = 0; i < set_of_results.size(); i++) {
@@ -2084,6 +2385,14 @@ void writeResults(vector<vector<Result> > &set_of_results, map<int, Result> corr
 		Result r2 = pos->second;
 		out_res << r.br << "-" << r.start << "-" << r.stop << "-" << (r.stop-r.start) << endl;
 		out_res << r2.br << "-" << r2.start << "-" << r2.stop << "-" << (r2.stop-r2.start) << endl;
+		if(r.gapArray.size() == 0) {
+			r.gapArray.push_back(r.start);
+			r.gapArray.push_back(r.stop);
+		}
+		for(unsigned int j = 0; j < r.gapArray.size(); j+=2) {
+			out_res << r.gapArray[j] << "-" << r.gapArray[j+1] << ", ";
+		}
+		out_res << endl;
 		out_res << r.matchString << endl;
 		br++;
 	}
@@ -2293,7 +2602,7 @@ void *preProcessRead(void *threadid) {
 
 		string read = (*(td->reads))[i];
 
-		if((i+1)%100 == 0) cout << "Read: " << i+1 << " started." << endl;
+		if((i+1)%10 == 0) cout << "Read: " << i+1 << " started." << endl;
 		processRead(td->sizes, td->sites, read, *(td->results), *(td->whole_genome),  td->thread_id, i+1);
 	}
 	pthread_exit(NULL);
@@ -2331,6 +2640,19 @@ void checkParameter(string command, string value) {
 			cout << "Parameter " << command << " not recognized." << endl;
 			exit(-1);
 		}
+}
+
+int main(int argc, char *argv[]) {
+	vector<int> coverage;
+	for(unsigned int i = 0; i < 83083540; i++) {
+		coverage.push_back(0);
+	//	if(i%10000 == 0) cout << i << endl;
+	}
+	outdir = argv[1];
+	string build = "1";
+	calculateCoverageFromResults(coverage, "/home/josip/Desktop/big_tests/results3fixed.txt");
+	writeCoverage2(outdir + "//" + "coverage3" + build + ".txt", coverage);
+	writeNewRef(outdir + "//" + "newref" + build + ".fa", coverage);
 }
 
 int main2(int argc, char *argv[]) {
@@ -2372,7 +2694,7 @@ int main2(int argc, char *argv[]) {
 	traceback(read, gref, 0, grefLimit, max[0], max[1], max[2], r, packed);
 }
 
-int main(int argc, char *argv[]) {
+int main3(int argc, char *argv[]) {
 
 	if(argc != 4 && argc != 6 && argc != 8 && argc != 10) {
 		cout << "Program must run with arguments: <destination_folder> <reads_file> <genome_reference_file> -t <thread_number> -i <index_location> -c <create_index>" << endl;
@@ -2493,8 +2815,9 @@ int main(int argc, char *argv[]) {
 	length_of_sites = res[2][0];
 
 	vector<string> reads;
+	map<int, FastaRead> read_names;
 	map<int, Result> correct_results;
-	readReads(reads, correct_results, argv[2]);
+	readReads(reads, read_names, correct_results, argv[2]);
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
@@ -2516,7 +2839,9 @@ int main(int argc, char *argv[]) {
 		set_of_results.push_back(tmp);
 	}
 	ThreadData3 datas3[thread_num];
-	int difference = reads.size() / thread_num;
+	//int difference = (reads.size()/10) / thread_num;
+	//int padding = 9 * (reads.size()/10);
+	int difference = reads.size()/thread_num;
 
 	for(int i = 0; i < thread_num; i++) {
 		int start =  i*difference;
@@ -2550,7 +2875,9 @@ int main(int argc, char *argv[]) {
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	writeResults(set_of_results, correct_results, outdir + "//" + "results.txt");
+	string build = SSTR(build_number);
+	writeResults(set_of_results, correct_results, outdir + "//" + "results" + build + ".txt");
+	writeSamResults(set_of_results, reads, read_names, outdir + "//" + "results" + build + ".sam");
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
@@ -2561,12 +2888,15 @@ int main(int argc, char *argv[]) {
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
 	Statistic s = Statistic(reads.size());
-	writeStatistics(set_of_results, correct_results, outdir + "//" + "statistics.txt", s);
+	writeStatistics(set_of_results, correct_results, outdir + "//" + "statistics" + build + ".txt", s);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "Statistics written: " << timefinal << " seconds. " << endl;
+
+	int cutoff = whole_genome.size();
+	whole_genome.clear();
 
 	if(read_index) {
 		free(sizes);
@@ -2581,12 +2911,39 @@ int main(int argc, char *argv[]) {
 	delete [] res[2];
 	delete [] res;
 
+	gettimeofday(&t1, NULL);
+	startday = t1.tv_sec;
+	startday2 = t1.tv_usec;
+	vector<int> coverage;
+	for(unsigned int i = 0; i < cutoff; i++) {
+		coverage.push_back(0);
+	}
+	calculateCoverageFromResults(coverage, outdir + "//" + "results" + build + ".txt");
+	//calculateCoverage(coverage, set_of_results);
+	writeCoverage(outdir + "//" + "coverage" + build + ".txt", coverage);
+	writeCoverage2(outdir + "//" + "coverage2" + build + ".txt", coverage);
+	writeNewRef(outdir + "//" + "newref" + build + ".fa", coverage);
+	//checkCoverage(coverage);
+	gettimeofday(&t2, NULL);
+	endday = t2.tv_sec;
+	endday2 = t2.tv_usec;
+	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	cout << "Coverage written: " << timefinal << " seconds. " << endl;
+
+	gettimeofday(&t1, NULL);
+	startday = t1.tv_sec;
+	startday2 = t1.tv_usec;
+
+	writeNewRef(outdir + "//" + "newref" + build + ".txt", coverage);
+
+	gettimeofday(&t2, NULL);
+	endday = t2.tv_sec;
+	endday2 = t2.tv_usec;
+	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	cout << "New ref written: " << timefinal << " seconds. " << endl;
+
 	cout << "Program ended." << endl;
-/*
-	cout << std::numeric_limits<int>::max() << endl;
-	cout << std::numeric_limits<long>::max() << endl;
-	cout << std::numeric_limits<ulong>::max() << endl;
-*/
+
 	return 0;
 }
 

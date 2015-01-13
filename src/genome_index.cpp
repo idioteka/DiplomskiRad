@@ -382,7 +382,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, string genome_ref, 
 
 }
 
-int main3(int argc, char *argv[]) {
+int main4(int argc, char *argv[]) {
 	return 0;
 }
 
