@@ -137,7 +137,7 @@ void writeSizes(int *sizes, string loc) {
 	FILE* pFile;
 	pFile = fopen(loc.c_str(), "wb");
 	//TODO check if file exist
-	fwrite(sizes, sizeof(int), keyspace, pFile);
+	fwrite(sizes, sizeof(int), KEYSPACE, pFile);
 	fclose(pFile);
 }
 
@@ -201,7 +201,7 @@ int ** readIndex(string &whole_genome, string genome_ref, string index_loc, bool
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
 
-	string build = SSTR(build_number);
+	string build = SSTR(BUILD_NUMBER);
 	string loc = index_loc + "//" + "sizes" + build;
 	if(part_genome) {
 		loc = index_loc + "//" + "6sizes" + build;
@@ -231,7 +231,7 @@ int ** readIndex(string &whole_genome, string genome_ref, string index_loc, bool
 
 	int **result = new int*[4];
 	result[0] = new int[1];
-	result[0][0] = keyspace;
+	result[0][0] = KEYSPACE;
 	result[1] = sizes;
 	result[2] = new int[1];
 	result[2][0] = key_num;
@@ -242,7 +242,7 @@ int ** readIndex(string &whole_genome, string genome_ref, string index_loc, bool
 void writeInfo(int sizes, int sites, string path, string &genome) {
 	//string build = SSTR(build_number);
 	ofstream ofs(path.c_str());
-	ofs << "build number: " << build_number << endl;
+	ofs << "build number: " << BUILD_NUMBER << endl;
 	ofs << "genome size: " << genome.size() << endl;
 	ofs << "sizes size: " << sizes << endl;
 	ofs << "sites size: " << sites << endl;
@@ -252,8 +252,8 @@ void writeInfo(int sizes, int sites, string path, string &genome) {
 int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, string genome_ref, string index_loc, int keylen, int kspace, int build_num) {
 
 	KEYLEN = keylen;
-	keyspace = kspace;
-	build_number = build_num;
+	KEYSPACE = kspace;
+	BUILD_NUMBER = build_num;
 
 	if(!part_genome) {
 		extractGenomeFromFile(genome_ref, whole_genome);
@@ -266,7 +266,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 
 	pthread_t threads[4];
 	int rc;
-	int *sizes = new int[keyspace] {0};
+	int *sizes = new int[KEYSPACE] {0};
 	pthread_attr_t attr;
 	void *status;
 	pthread_attr_init(&attr);
@@ -304,7 +304,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 	cout << "Created sizes: " << timefinal << endl;
 
 	int sum=0;
-	for(int i = 0; i < keyspace; i++) {
+	for(int i = 0; i < KEYSPACE; i++) {
 		int temp = sizes[i];
 		sizes[i] = sum;
 		sum += temp;
@@ -315,7 +315,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 		gettimeofday(&t1, NULL);
 		long startday = t1.tv_sec;
 		long startday2 = t1.tv_usec;
-		string build = SSTR(build_number);
+		string build = SSTR(BUILD_NUMBER);
 		string loc = index_loc + "//sizes" + build;
 		if(part_genome) {
 			loc = index_loc + "//6sizes" + build;
@@ -364,7 +364,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "Created sites: " << timefinal << endl;
 
-	string build = SSTR(build_number);
+	string build = SSTR(BUILD_NUMBER);
 	if(write_to_file) {
 		gettimeofday(&t1, NULL);
 		long startday = t1.tv_sec;
@@ -381,7 +381,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 		cout << "Wrote sites: " << timefinal << endl;
 	}
 
-	for(int i = keyspace-1; i > 0; i--) {
+	for(int i = KEYSPACE-1; i > 0; i--) {
 		sizes[i] = sizes[i-1];
 	}
 	sizes[0] = 0;
@@ -390,11 +390,11 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 	if(part_genome) {
 		loc = index_loc + "//6index" + build + ".info";
 	}
-	writeInfo(keyspace, sum, loc, whole_genome);
+	writeInfo(KEYSPACE, sum, loc, whole_genome);
 
 	int **result = new int*[4];
 	result[0] = new int[1];
-	result[0][0] = keyspace;
+	result[0][0] = KEYSPACE;
 	result[1] = sizes;
 	result[2] = new int[1];
 	result[2][0] = sum;
