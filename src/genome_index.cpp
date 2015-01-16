@@ -257,8 +257,6 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 
 	if(!part_genome) {
 		extractGenomeFromFile(genome_ref, whole_genome);
-		cout << "drugi: " << drugi << endl;
-		cout << "extracting: " << endl;
 	}
 
 	timeval t1, t2;

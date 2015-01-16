@@ -51,7 +51,7 @@ static int MAX_HITS_REDUCTION2 = 3;
 //static int MAXIMUM_MAX_HITS_REDUCTION = 5;
 static int MAXIMUM_MAX_HITS_REDUCTION = 6;
 
-static bool drugi = false;
+static bool is_second_phase = false;
 
 static vector<int> positions_index;
 

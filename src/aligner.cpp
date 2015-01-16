@@ -114,10 +114,11 @@ struct ThreadData3 {
 	int stop;
 	string *whole_genome;
 	vector<Result> *results;
+	vector<Read> *aligned_reads;
 	vector<Read> *unaligned_reads;
 	ThreadData3() {
 	}
-	ThreadData3(int thread_id_, int *sizes_, int *sites_, vector<Read> *reads_, int start_, int stop_, string *whole_genome_, vector<Result> *results_, vector<Read> *unaligned_reads_) {
+	ThreadData3(int thread_id_, int *sizes_, int *sites_, vector<Read> *reads_, int start_, int stop_, string *whole_genome_, vector<Result> *results_, vector<Read> *aligned_reads_, vector<Read> *unaligned_reads_) {
 		thread_id = thread_id_;
 		sizes = sizes_;
 		sites = sites_;
@@ -126,6 +127,7 @@ struct ThreadData3 {
 		stop = stop_;
 		whole_genome = whole_genome_;
 		results = results_;
+		aligned_reads = aligned_reads_;
 		unaligned_reads = unaligned_reads_;
 	}
 };
@@ -304,9 +306,9 @@ void writeNewRef(string file, string file2, vector<int> &coverage, string &part_
 	ofstream out2(file2.c_str());
 	vector<int> starts;
 	vector<int> stops;
-	int start = -1;
-	int stop = -1;
-	int position = -1;
+	unsigned int start = 0;
+	unsigned int stop = 0;
+	unsigned int position = 0;
 	for(unsigned int i = 0; i < coverage.size(); i++) {
 		if(coverage[i] > 0) {
 			start = i;
@@ -317,7 +319,6 @@ void writeNewRef(string file, string file2, vector<int> &coverage, string &part_
 	}
 	for(unsigned int i = position; i < coverage.size(); i++) {
 		if(coverage[i] > 0) {
-			//sum++;
 			if(stop + 32000 > i) {
 				stop = i;
 			}
@@ -327,24 +328,14 @@ void writeNewRef(string file, string file2, vector<int> &coverage, string &part_
 				start = i;
 				stop = i;
 			}
-			/*int tmp = i - stop;
-
-			if(tmp > 32000) {
-				cout << stop << "-" << i << " " << tmp << endl;
-				sum += tmp;
-			}
-			stop = i;*/
 		}
 	}
 	starts.push_back(start);
 	stops.push_back(stop);
 
 	for(unsigned int i = 0; i < starts.size(); i++) {
-		out << starts[i] << "-" << stops[i] << /*" " << (stops[i] - starts[i]) << */endl;
-		//int pos2 = starts[i];
 		int pos3 = starts[i]-32000;
 		int pos4 = stops[i]+1;
-		//int length = (stops[i]-starts[i])+1;
 		out2 << "> " << starts[i] << "-" << stops[i] << endl;
 		for(int j = 0; j < 32000; j++) {
 			positions.push_back(pos3);
@@ -357,7 +348,6 @@ void writeNewRef(string file, string file2, vector<int> &coverage, string &part_
 			out2 << whole_genome[j];
 			part_genome.push_back(whole_genome[j]);
 		}
-		//out2 << whole_genome.substr(pos2, length);
 		for(int j = 0; j < 32000; j++) {
 			positions.push_back(pos4);
 			out2 << "N";
@@ -367,38 +357,6 @@ void writeNewRef(string file, string file2, vector<int> &coverage, string &part_
 		out2 << endl;
 	}
 
-}
-
-void writeNewRef2(string file, vector<int> &coverage) {
-	int start = 0;
-	int stop = 0;
-	int previous = coverage[0];
-	vector<int> starts;
-	vector<int> stops;
-	for(unsigned int i = 1; i < coverage.size(); i++) {
-		if(coverage[i] != 0 && previous != 0) {
-			stop = i;
-			previous = coverage[i];
-		}
-		else if(coverage[i] != 0 && previous == 0) {
-			start = i;
-			stop = i;
-			previous = coverage[i];
-		}
-		else if(coverage[i] == 0 && previous != 0) {
-			starts.push_back(start);
-			stops.push_back(stop);
-			start = i+1;
-			stop = i+1;
-			previous = coverage[i];
-		}
-		else if(coverage[i] == 0 && previous == 0) {
-			start = i+1;
-			stop = i+1;
-			previous = coverage[i];
-		}
-
-	}
 }
 
 /*
@@ -454,23 +412,21 @@ void calculateCoverageFromResults(vector<int> &coverage, string infile) {
 	}
 }
 
-void calculateCoverageFromVector(vector<int> &coverage, vector<vector<Result> > &results) {
+void calculateCoverageFromVector(vector<int> &coverage, vector<Result> &results) {
 	for(unsigned int i = 0; i < results.size(); i++) {
-		for(unsigned int j = 0; j < results[i].size(); j++) {
-			Result r = results[i][j];
-			if(r.gapArray.size() == 0) {
-				r.gapArray.push_back(r.start);
-				r.gapArray.push_back(r.stop);
-			}
-			if(r.br % 50 == 0) {
-				cout << "read: " << r.br << endl;
-			}
-			for(unsigned int k = 0; k < r.gapArray.size(); k+=2) {
-				int start = r.gapArray[k];
-				int stop = r.gapArray[k+1];
-				for(int l = start; l <= stop; l++) {
-					coverage[l] = coverage[l]+1;
-				}
+		Result r = results[i];
+		if(r.gapArray.size() == 0) {
+			r.gapArray.push_back(r.start);
+			r.gapArray.push_back(r.stop);
+		}
+		/*if(r.br % 50 == 0) {
+			cout << "read: " << r.br << endl;
+		}*/
+		for(unsigned int k = 0; k < r.gapArray.size(); k+=2) {
+			int start = r.gapArray[k];
+			int stop = r.gapArray[k+1];
+			for(int l = start; l <= stop; l++) {
+				coverage[l] = coverage[l]+1;
 			}
 		}
 	}
@@ -1607,8 +1563,6 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, lo
 					scoreMS+=POINTSoff_DEL_REF_N;
 					scoreD+=POINTSoff_DEL_REF_N;
 				}else if(gap){
-					long tmp = scoreMS;
-					long tmp2 = scoreD;
 					scoreMS+=POINTSoff_GAP;
 					scoreD+=POINTSoff_GAP;
 				}
@@ -1677,129 +1631,6 @@ void fillUnlimited(string &read, string &ref, int refStartLoc, int refEndLoc, lo
 	max[2] = maxState;
 	max[3] = maxScore;
 }
-/*
-void traceback2(string &read, string &ref, int refStartLoc, int refEndLoc, int row, int col, int state, Result &r, vector<vector<vector<long> > > &packed) {
-
-	int outPos=0;
-	int gaps=0;
-
-	int addon = refEndLoc - col;
-
-	string out;
-	string rout;
-
-	while(row>0 && col>0){
-
-		long time=packed[state][row][col]&TIMEMASK;
-		long prev;
-
-		if(state==MODE_MS){
-			if(time>1){prev=(long)state;}
-			else{
-				long scoreFromDiag=packed[MODE_MS][row-1][col-1]&SCOREMASK;
-				long scoreFromDel=packed[MODE_DEL][row-1][col-1]&SCOREMASK;
-				long scoreFromIns=packed[MODE_INS][row-1][col-1]&SCOREMASK;
-				if(scoreFromDiag>=scoreFromDel && scoreFromDiag>=scoreFromIns){prev=MODE_MS;}
-				else if(scoreFromDel>=scoreFromIns){prev=MODE_DEL;}
-				else{prev=MODE_INS;}
-			}
-
-			char c=toupper(read[row-1]);
-			char r=toupper(ref[refStartLoc+col-1]);
-			if(c==r){
-				out.push_back('M');
-				rout.push_back(r);
-			}else{
-				out.push_back('S');
-				rout.push_back(r);
-			}
-			row--;
-			col--;
-		}else if(state==MODE_DEL){
-			if(time>1){prev=(long)state;}
-			else{
-				long scoreFromDiag=packed[MODE_MS][row][col-1]&SCOREMASK;
-				long scoreFromDel=packed[MODE_DEL][row][col-1]&SCOREMASK;
-				if(scoreFromDiag>=scoreFromDel){prev=MODE_MS;}
-				else{prev=MODE_DEL;}
-			}
-
-			char r=toupper(ref[refStartLoc+col-1]);
-			if(r==GAPC){
-				out.push_back('-');
-				gaps++;
-				rout.push_back('-');
-			}else{
-				out.push_back('D');
-				rout.push_back(r);
-			}
-			col--;
-		}else{
-			if(time>1){prev=(long)state;}
-			else{
-				long scoreFromDiag=packed[MODE_MS][row-1][col]&SCOREMASK;
-				long scoreFromIns=packed[MODE_INS][row-1][col]&SCOREMASK;
-				if(scoreFromDiag>=scoreFromIns){prev=MODE_MS;}
-				else{prev=MODE_INS;}
-			}
-
-			if(col==0){
-				rout.push_back('x');
-			}else{
-				rout.push_back('I');
-				out.push_back(toupper(read[row-1]));
-			}
-			row--;
-		}
-
-		state=prev;
-		outPos++;
-	}
-
-	if(col!=row){
-		while(row>0){
-			out.push_back(toupper(read[row-1]));
-			rout.push_back('i');
-			outPos++;
-			row--;
-			col--;
-		}
-		if(col>0){
-			//do nothing
-		}
-	}
-
-	reverse(out.begin(),out.end());
-	reverse(rout.begin(),rout.end());
-	cout << out << endl;
-	cout << rout << endl;
-
-	r.precise_start = r.start-MARIC_PADDING + col;
-	r.precise_stop = r.stop+MARIC_PADDING -addon;
-
-	if(gaps==0){
-		r.matchString = out;
-		return;
-	}
-
-	string out3;
-	int j = 0;
-	for(unsigned int i=0; i<out.size(); i++){
-		char c=out[i];
-		if(c!=GAPC){
-			out3.push_back(c);
-			j++;
-		}else{
-			int lim=j+GAPLEN;
-			for(; j<lim; j++){
-				out3.push_back('d');
-			}
-		}
-	}
-	r.matchString = out3;
-	return;
-}
-*/
 
 void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int row, int col, int state, Result &r, vector<vector<vector<long> > > &packed) {
 
@@ -2002,14 +1833,7 @@ void makeMatchString(vector<SiteScore> &results, string &read, string &read_reve
 	}
 	Result r = Result(br, ss.start, ss.stop);
 	r.gapArray = ss.gapArray;
-	/*if(drugi) {
-		if(ss.strand == 0) {
-			makeMatchStringForSite(ss, read, sizes, sites, r, whole_genome, threadId);
-		}
-		else {
-			makeMatchStringForSite(ss, read_reverse, sizes, sites, r, whole_genome, threadId);
-		}
-	}*/
+
 /*
 	if(ss.strand == 0) {
 		makeMatchStringForSite(ss, read, sizes, sites, r, whole_genome, threadId);
@@ -2284,9 +2108,7 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 	}
 }
 
-void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFinal, vector<Read> &unaligned_reads, string &whole_genome, int threadId, int br) {
-
-	//cout << "Alignin read: " << br << endl;
+void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFinal, vector<Read> &aligned_reads, vector<Read> &unaligned_reads, string &whole_genome, int threadId, int br) {
 
 	int split_size = r1.size() / split_count;
 	for(int i = 0; i < split_count; i++) {
@@ -2296,7 +2118,6 @@ void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFina
 
 		vector<int> offsets;
 		makeOffsets(read, offsets);
-		//cout << "offsets size: " << offsets.size() << endl;
 		vector<int> read_keys;
 		getReadKeys(read, offsets, read_keys);
 		vector<int> read_keys_copy = read_keys;
@@ -2377,9 +2198,10 @@ void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFina
 		}
 
 		if(results.size() != 0) {
-			//cout << "aligned: " << br << endl;
 			makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br);
 			aligned_base_num += read.size();
+			Read rea(br, read);
+			aligned_reads.push_back(rea);
 		}
 		else {
 			Read rea(br, read);
@@ -2441,7 +2263,7 @@ void writeSamResults(vector<Result> &set_of_results, vector<Read> &reads, map<in
 		results.push_back(set_of_results[j]);
 	}
 
-	cout << "size of results: " << results.size() << endl;
+	//cout << "size of results: " << results.size() << endl;
 	sortResults(results);
 	ofstream out_res(infile.c_str());
 	for(unsigned int i = 0; i < results.size(); i++) {
@@ -2474,7 +2296,7 @@ void writeSamResults(vector<Result> &set_of_results, vector<Read> &reads, map<in
 	}
 }
 
-void writeResults(vector<Result> &set_of_results, map<int, Result> &correct_results, string infile, bool second, string &whole_genome) {
+void writeResults(vector<Result> &set_of_results, map<int, Result> &correct_results, string infile) {
 
 	vector<Result> results;
 	for(unsigned int j = 0; j < set_of_results.size(); j++) {
@@ -2490,23 +2312,32 @@ void writeResults(vector<Result> &set_of_results, map<int, Result> &correct_resu
 		Result r2 = pos->second;
 		int start = r.start;
 		int stop = r.stop;
-		if(second) {
+		if(is_second_phase) {
 			start = positions_index[start];
 			stop = positions_index[stop];
 			out_res << r.br << "-" << start << "-" << stop << "-" << (stop-start) << endl;
 		}
-		out_res << r.br << "-" << r.start << "-" << r.stop << "-" << (r.stop - r.start) << endl;
+		else {
+			out_res << r.br << "-" << r.start << "-" << r.stop << "-" << (r.stop - r.start) << endl;
+		}
 		out_res << r2.br << "-" << r2.start << "-" << r2.stop << "-" << (r2.stop-r2.start) << endl;
 		if(r.gapArray.size() == 0) {
-			r.gapArray.push_back(start);
-			r.gapArray.push_back(stop);
+			r.gapArray.push_back(r.start);
+			r.gapArray.push_back(r.stop);
 		}
-		for(unsigned int j = 0; j < r.gapArray.size(); j+=2) {
-			out_res << r.gapArray[j] << "-" << r.gapArray[j+1] << ", ";
+		if(is_second_phase) {
+			for(unsigned int j = 0; j < r.gapArray.size(); j+=2) {
+				out_res << positions_index[r.gapArray[j]] << "-" << positions_index[r.gapArray[j+1]] << ", ";
+			}
+		}
+		else {
+			for(unsigned int j = 0; j < r.gapArray.size(); j+=2) {
+				out_res << r.gapArray[j] << "-" << r.gapArray[j+1] << ", ";
+			}
 		}
 		out_res << endl;
-		//out_res << r.matchString << endl;
-		out_res << whole_genome.substr(r.start, (r.stop - r.start)) << endl;
+		out_res << r.matchString << endl;
+		//out_res << whole_genome.substr(r.start, (r.stop - r.start)) << endl;
 		br++;
 	}
 
@@ -2769,11 +2600,11 @@ void writeStatistics(vector<Result> &results, map<int, Result> &correct_results,
 		Result r1 = results[i];
 		map<int, Result>::iterator pos = correct_results.find(r1.br);
 		Result r2 = pos->second;
-		if(drugi == false) {
+		if(is_second_phase == false) {
 		calculateStatistics(r1, r2, out_stat, statistic);
 		}
 		//cout << "1" << endl;
-		if(drugi) {
+		if(is_second_phase) {
 			calculateStatistics6(r1, r2, out_stat, statistic);
 			calculateStatistics4(r1, r2, out_stat, statistic);
 			calculateStatistics5(r1, r2, out_stat, statistic);
@@ -2845,11 +2676,11 @@ void *preProcessRead(void *threadid) {
 
 		Read read = (*(td->reads))[i];
 
-		if(drugi) {
+		if(true) {
 			if((i+1)%10 == 0) cout << "Read: " << read.br << " started." << endl;
 		}
 		/*if((i+1)%10 == 0)*/ //cout << "Read: " << read.br << " started." << endl;
-		processRead(td->sizes, td->sites, read.content, *(td->results), *(td->unaligned_reads), *(td->whole_genome),  td->thread_id, read.br);
+		processRead(td->sizes, td->sites, read.content, *(td->results), *(td->aligned_reads), *(td->unaligned_reads), *(td->whole_genome),  td->thread_id, read.br);
 	}
 	pthread_exit(NULL);
 }
@@ -2895,58 +2726,6 @@ void checkParameter(string command, string value) {
 		cout << "Parameter " << command << " not recognized." << endl;
 		exit(-1);
 	}
-}
-
-int main3(int argc, char *argv[]) {
-	vector<int> coverage;
-	for(unsigned int i = 0; i < 83083540; i++) {
-		coverage.push_back(0);
-	//	if(i%10000 == 0) cout << i << endl;
-	}
-	outdir = argv[1];
-	string build = "1";
-	calculateCoverageFromResults(coverage, "/home/josip/Desktop/big_tests/results3fixed.txt");
-	writeCoverageFiltered(outdir + "//" + "coverage3" + build + ".txt", coverage);
-	//writeNewRef(outdir + "//" + "newref" + build + ".fa", coverage);
-}
-
-int main2(int argc, char *argv[]) {
-
-	string read = "GTTAAAGCCCCAGACGTCAAAGCCATCCCGGTTGTGAATCCTTGTTTGAGAGCCTCTCCCTTCGCTCATGCTGTGTGGATCTTGAGACACCTCATCTCCCAGATGATTGTTTTGAACCTATATATTTTACCATTCTCAATGATCAAATGTAGCGCTTGAGATGGACTTACTGCTCGCTCTGCCGCATGCTGGGTTTCTTTCTAGACCCCTCTTCCTCCTGTCACCTGGGACAGCATGTGGGTTGGCAGAGGCCGATAAAGAAGCCCCGAAACTCAAATGAAAGGTCATCAGGTCCAGAGCTACCTATTAGCTTAAATTTGATCCGGTAGGAGACAAGGTGCTTAAGAGGGATAGACCTATGGGCGGAGGAAACAGCCGGAAGAAGAGAATTAAGAGACCCTCGATGAAATTTTAAATATTTAAAAAAATAAAAGTTACTGGGAAGGTGGTTAATAGAAACAGACGATTAGCGACCCAACTAGAAAGCTACACAGGTGTTCGACGAGAGAAATTGAGGGGCTGTAAGCCTAAGGATTGAATTCTAAAGATACAATGGAAAAGGGAGTATGAAGGCACACCAGGGCCTTGCGGACATCTCCTTACCTTCATTCCAGCATGAAGGAGGAGAAGGGCAGGGAGGTAGGGAGCATTTCAGCAGAGCCAGCACCAGCTTTGATAATCTCCCCCAGCTACCCTATTTAAGGAGTTCGAGGTTTAAGAGTTTAAAAACAGGTGGCACCGAGACCCCAATTCAGGAGACAGTAGGTTACTCCGGGTTCGAAGAGAAATCCTATCTGAGGCCTGTTGGCTTCCCGGGCTTCAGCAGAGACCCTCTAGGGAACCAGTAGTCACTTGATCAGTCCTGATGCCTTGACCCAATCGCCGAGAGTCGCTAAGGCTAGAGGTATTTGAGGGAGTCGAGCCCCCAAGCCTCGTGTGGCACTAATAGGCAGTTATAGAAAAGGCGGGTCCTAAGATCATTGGTGTTAGGCGGGATCGGGTAGGGGGAGCATGTCTTCTGTGCTGGAAACAGAAGGGGTATTTCAAGATGGCAGACCCATTCAATTATTGGAGCTATAAGCTCCTAGAATTGCTCGATGGGCTATCTCGGTTTCCCTTGCATCACATCTGCGCCTGAACTGCACCTGTCATGGCGGGTCCATCTTCGTCCCCGATCTCCCGTTAGTCAATCGATGTCCGCTGAACAAAATTCATTGGTGCCCCAATCACGTTCCGGTCAATCCCGCGTCTCTTCTTCCTCGGCTGGGGTTTTTCTACCACACAGCAGCGTAGTTTATGCCGAAATTCACTCTTGCTCCCTGATGGTTCCAGCTTCACGCAACTGTCTGAAGGCCCTCAGGGCTCTTTCGCTTGTGTCTGTACAACCCCCTCCACGCTCTCCCCAGATAGACCACCACCCTGGGTTCACTCATCTTCATGGGTCGTGACGGCGTGGAATGCCTGGAACCATTAACTGAGCAGTAAAGGTCAGTGGCACATAGCCCAAGAGATGAACAGGACCAGAGACAGAGGGGGGCAGGAACTCACAAGGTTATGTCTTCCTAAGAATCGGAACCCTGTCCGTGAATTCCTTCCTGAAACCTGTGTTCATTCGGTCTAGCTGTGTCCTATATAACTGAACTCTTGTGAGTACACCCCTGTGCGCACATCCGTGGCATGGCCACCTCTTCACGTATCTCCAGTACAGATGATCTATGTACAAGTTATACGTACTTGTGACAGATTTCTTCTGTCCCATGAGCAACGTTTTCCCCATCGTCCACATGTCCTATCAGTCAATGTGGTCTGACGCCCACCCTATACAGCCCAGGCGTCCCTCGCGTTGTGACCTGTGCTGCGCTCCCGCCTCACCAATTCTATGCACAAGCTTCATCAGTGAATCAGACGTAAGGAAATCTCCTAGAGTACTAGTGTCCAAGAAATAACTTCCTCCCTTCTCACTACTGCCAGCGAGGGTGGGACACATCCGGGTTTCATCT";
-	string gref = "aagaacacttcagcccaaaatgtcaaaggcatctcggttgtgaaaccttgTTCTAGAGCCTCTCCCTGCTCCCGTGCTGTGAGGATCTTAAGACTCCTAAACTCACAGATGATTGTTTTCAACCTATTTATCTCACCATCCTCAATGATCAGAAGTCCACCTTGAGATGGACTTACTCCTAGTTCTGCCGCATTCTGGGTTTCTTTCCAGACCCCTCTTCCTCCTCTCACCTGGGCCAGCAGGGAGGTTGGCAGAGGGCAGGAAAGATGCCCCAAAACTTAAATGGAATGTCATCAGGTGAAGAGCTACCTCTTACCTTAACTCTTATTCGGTGGGAAACAAGGTTCCTAATAGGGATAGAGTTAAGGGCGGAGGCAACAGCAGGATGAGGATAATTAAGAGAACCTGaattaaatttttaatattttaaaaaaGGAAAGTTGCTGGGAAGCTGGTAAACAGAAACAGAAGATTAGAGGCCTAACTAGAAAGAGACACTGGTGTTAGCAGAGAGATATTGAGGGGCTGTAAGCCTAAGGTTTGAAATCTAAAGATAGAGTGGAAAAGGGAGTAGGCACCCCCACCAGCCCCTGCTTGACATCTGCTTTAGTTCATTCCAGCAGGAAGGAGGAGAAGGGCAGGGAGGTAGGGAGCTTCTCAGCAAAGCCAGCTTCAGCTTTGATAATCTCACCCACCTACCCCATTTAAGGAGTTCCAGGTTTAAGAGTTTAAAAACAGGTGGCACCCAGACCATCATTCAGGAGACAGGAACTCATTCCAGGTTCCTAGAGAACTCCTATCTCAGACCTGAGGGTTTCCAGGGCTTCAGCTGAGCTCCTCTGGCTAACCAGTAGTCACTTGATCAGTCCTGCTGCCTTGACCCCATCTCCAGGAGGGGCTATGGCCAGAGGGAGTAGAGGGAGTCCAGCCCCCAAGCCTTGTGAGGCACTGTTAGGCAGATAGGGAAAAGAGGGGTCCTTAGATCACTGGTTCAAGGAGGGATCTGGTAGGGGCAGCATTTCTTCTGGGCTGGAAACAGAATGGGGGTTTCAAGATGGCAGAACCTGAAATAAAAAAAAAGTTTTTCTTAAAGAAGATTAGCCTCAAAGAAAACCAAGGCTTTAGGAAGAAGGCACTACCTAGTGCAGACTTTAAGCTATTTCCACAGTGTGTTCTTTA------GGGTTTCTCTAATCACTCACCATTCCATTATTGGAGCTATAAGCCCCTAGAATTGCTCCATGGCCTATCTCGGTTTCCCTTGGATCTCATCTGCTCCTGAACTGCACCTGTCTGTAAAAAAACAGATGCGAGACACCTTCGTAAGTCTTCATATCCTACAGTAAGAACTCTACTTTGTGCCTTCCAGGGAAGAGGCTGACGCCATCTCCTTGACAATAGCAGCCATCTGCTAACCACCATTCCTCCTAGGGGAGTCTCAATGCCTCTTTTCACACTGGCCT----TTTCCTTGTTACCATGGCAAGTCCATCTCCGGCCCCCATCTCCCCTGAGCCAATGTGAGTCAGGTGAACAAAATTCATTGGTTCCCCAATCATGGTCCGGTCAATCCGTCTTCTCTTCTTCTTCTGCTTGGAGAAGATAAGGAGTCATGTCTTAAGGCCCCTCCTCCAGTCAGCACGGAGGAAGGGAAAAGAGTCTTCAAAACCACTGAAAAGCTAAGGGCCTGGTGGGAAGAGGGGATGTGGCATTTTAACAGGGAAATCACTAGGGCATGAAAGGCAAA---AGACTCACCGGCTGGGGTTTCTCTACCACACAGCAGCCCAGTTTGTGCCAAAATTCACTCATGTTCCCTGATGGTTCCAGCTTCACTCCGCTGTCTGAGGCCCCAAAGGGCTCTTTCCCTGGTGTTTGGACAACCCACTCCTCACTCTCCCCAGATACACCACCACCCTGGGTTCACTCAGCTGGATGGGTCCAGACAAAGTGGAATCCCTGGAACCTTTAACTGAGCAGTGAAGGTCAGTGTCTCAGAGCCTGAGAGATGAACAGGACCAGAGAGAGAGGTGGGCAGGCAGGCACAAGGTTATGTCTTCCTCAGACTCGGAACCCTGGATTAGAAGAAAGTAAAAAGAAAGATCAGTGAGAAATCTCCCCCTCCCCCAATCCTTGAGAAACCTCCTGATGAGCCTATATCTTCCCAGTCCTCCCTGAGAGGCCCTAGACCTGTACACCAACACTCATTCCCAAACACTATGAACCTCAGTTTGACTCTAAAAAAAAGGAACAGAACCAAAAGGACACCAAGGGGTTAAGGAGCAGTGGCTGGTGGTACCAAGGGAGAGGAAGGGGGCTAGAAGCACTTAGAGTTAAGAGGATGGGCGAGGACCAA----CTGTGTACAGGTTGTGGGTACATGTGCCAGGTATCTTCTGTCCCATGAGGAATATTTTCCCCACCGTCCACATGTCCTATCTGCCACTCTGCTCTGCCTCACACCCTATAGGGCCCAGGCTCCCCTCCAGCTGTGACCTGTTCTCCCCTCCCTCCTCACCAATTCTATCCTCAAGCTTCATCAGTGAACCAGACATAAGGAACTTTCCAATAGTACTAGTGTCCAAGGAAGAACTTCCTCCCTTCTCACTACTGCCAGCCAGGGTAGGACACATCTGGGTTTCTTCTTAGACT";
-	int grefLimit = 2657;
-	long max[4];
-
-	int rows = read.size();
-	int columns = grefLimit+1;
-	vector<vector<vector<long> > > packed;
-
-	for(int matrix=0; matrix<3; matrix++){
-		vector<long> row;
-		for(int i = 0; i <= columns; i++) {
-			row.push_back(0);
-		}
-		vector<vector<long> > mat;
-		mat.push_back(row);
-		for(int i=1; i<=rows; i++){
-			vector<long> row;
-			for(int j=0; j<columns+1; j++){
-				row.push_back(BADoff);
-			}
-			mat.push_back(row);
-		}
-		for(int i=0; i<=rows; i++){
-			int prevScore=(i<2 ? 0 : mat[i-1][0]);
-			int score=prevScore+POINTSoff_INS_ARRAY[i];
-			mat[i][0]=score;
-		}
-		packed.push_back(mat);
-	}
-
-	fillUnlimited(read, gref, 0, grefLimit, max, packed);
-	Result r(0,0,0);
-
-	traceback(read, gref, 0, grefLimit, max[0], max[1], max[2], r, packed);
 }
 
 int readParams(int argc, char *argv[]) {
@@ -3086,7 +2865,8 @@ bool createDirectories() {
 }
 
 void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &correct_results,
-		string &whole_genome, vector<Read> &reads, bool read_index, bool add, vector<Read> &unaligned) {
+		string &whole_genome, vector<Read> &reads, bool read_index, vector<Read> &unaligned,
+		vector<Read> &aligned, vector<Result> &tmp_results) {
 	int *sizes = res[1];
 	int *sites = res[3];
 
@@ -3100,9 +2880,8 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 
 	cout << "Number of reads: "<< reads.size() << "\n";
 	string build = SSTR(build_number);
-	//unsigned int cutoff = whole_genome.size();
-
 	pthread_t threads[thread_num];
+
 	int rc;
 	pthread_attr_t attr;
 	void *status;
@@ -3119,13 +2898,18 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 		vector<Read> tmp;
 		unaligned_reads.push_back(tmp);
 	}
+	vector<vector<Read> > aligned_reads;
+	for(int i = 0; i < thread_num; i++) {
+		vector<Read> tmp;
+		aligned_reads.push_back(tmp);
+	}
 	ThreadData3 datas3[thread_num];
 	int difference = reads.size()/thread_num;
 
 	for(int i = 0; i < thread_num; i++) {
 		int start =  i*difference;
 		int stop =  i*difference + difference;
-		datas3[i] = ThreadData3(i, sizes, sites, &reads, start, stop, &whole_genome, &set_of_results[i], &unaligned_reads[i]);
+		datas3[i] = ThreadData3(i, sizes, sites, &reads, start, stop, &whole_genome, &set_of_results[i], &aligned_reads[i], &unaligned_reads[i]);
 	}
 	datas3[thread_num-1].stop = reads.size();
 	for(int i = 0; i < thread_num; i++) {
@@ -3151,7 +2935,6 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "Reads aligned: " << timefinal << " seconds." << endl;
 
-	vector<Result> tmp_results;
 	for(unsigned int i = 0; i < set_of_results.size(); i++) {
 		for(unsigned int j = 0; j < set_of_results[i].size(); j++) {
 			tmp_results.push_back(set_of_results[i][j]);
@@ -3164,19 +2947,26 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 			unaligned.push_back(unaligned_reads[i][j]);
 		}
 	}
-	set_of_results.clear();
+	unaligned_reads.clear();
+
+	for(unsigned int i = 0; i < aligned_reads.size(); i++) {
+		for(unsigned int j = 0; j < aligned_reads[i].size(); j++) {
+			aligned.push_back(aligned_reads[i][j]);
+		}
+	}
+	aligned_reads.clear();
 
 	cout << "Aligned reads: " << tmp_results.size() << endl;
 
-	string addon = "x";
-	if(add) {
-		addon = "";
+	string addon = "";
+	if(is_second_phase) {
+		addon = "x";
 	}
 
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	writeResults(tmp_results, correct_results, outdir + "//" + "results" + addon + build + ".txt", !add, whole_genome);
+	writeResults(tmp_results, correct_results, outdir + "//" + "results" + addon + build + ".txt");
 	writeSamResults(tmp_results, reads, read_names, outdir + "//" + "results" + addon + build + ".sam");
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
@@ -3208,69 +2998,25 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 	delete [] res[2];
 	delete [] res;
 
-	/*if(first) {
-		gettimeofday(&t1, NULL);
-		startday = t1.tv_sec;
-		startday2 = t1.tv_usec;
-		vector<int> coverage;
-		for(unsigned int i = 0; i < cutoff; i++) {
-			coverage.push_back(0);
-		}
-		calculateCoverageFromResults(coverage, outdir + "//" + "results" + build + ".txt");
-		writeCoverage(outdir + "//" + "coverage" + build + ".txt", coverage);
-		writeCoverageFiltered(outdir + "//" + "coverage" + build + ".cut", coverage);
-		gettimeofday(&t2, NULL);
-		endday = t2.tv_sec;
-		endday2 = t2.tv_usec;
-		timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-		gettimeofday(&t2, NULL);
-		cout << "Coverage written: " << timefinal << " seconds. " << endl;
+}
 
-		gettimeofday(&t1, NULL);
-		startday = t1.tv_sec;
-		startday2 = t1.tv_usec;
-		string part_genome;
-		string in1 = outdir + "//" + "newref" + build + ".info";
-		string in2 = outdir + "//" + "newref" + build + ".fa";
-		writeNewRef(in1, in2, coverage, part_genome, whole_genome);
-		whole_genome.clear();
-		gettimeofday(&t2, NULL);
-		endday = t2.tv_sec;
-		endday2 = t2.tv_usec;
-		timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-		cout << "New ref written: " << timefinal << " seconds. " << endl;
-
-		cout << "Creating second index..." << endl;
-		gettimeofday(&t1, NULL);
-		startday = t1.tv_sec;
-		startday2 = t1.tv_usec;
-		cout << "New ref written: " << timefinal << " seconds. " << endl;
-		res = createIndex(true, part_genome, true, in2, index_location, 6, pow(2, 2*6), build_number);
-		gettimeofday(&t2, NULL);
-		endday = t2.tv_sec;
-		endday2 = t2.tv_usec;
-		timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-
-		cout << "Size of new ref: " << part_genome.size() << endl;
-
-		KEYLEN = 6;
-
-		vector<Read> tmp_unaligned_reads;
-
-		readUnalignedReads(tmp_unaligned_reads, reads, outdir + "//" + "results" + build + ".txt");
-
-		cout << "Unaligned reads: " << tmp_unaligned_reads.size() << endl;
-
-		secondAlign(res, read_names, correct_results, whole_genome, tmp_unaligned_reads);
-
-		cout << "Program ended." << endl;
-		free(sizes);
-		free(sites);
-
-		delete [] res[0];
-		delete [] res[2];
-		delete [] res;
-	}*/
+void updatePrecision(bool prec) {
+	if(prec) {
+		MIN_QSCORE_MULT2 = 0.1;
+		PRESCAN_QSCORE_THRESH = 0.57;
+		Z_SCORE_MULT = 20;
+		MIN_QSCORE_MULT = 0.025;
+		MIN_SCORE_MULT = 0.15;
+		DYNAMIC_SCORE_THRESH = 0.84;
+	}
+	else {
+		MIN_QSCORE_MULT2 = 0.005;
+		PRESCAN_QSCORE_THRESH = 0.6 * 0.95;
+		Z_SCORE_MULT = 25;
+		MIN_QSCORE_MULT = 0.005;
+		MIN_SCORE_MULT = 0.02;
+		DYNAMIC_SCORE_THRESH = 0.64;
+	}
 }
 
 int main(int argc, char *argv[]) {
@@ -3278,20 +3024,14 @@ int main(int argc, char *argv[]) {
 	if(readParams(argc, argv) < 0) exit(-1);
 
 	if(precise) {
-		MIN_QSCORE_MULT2 = 0.1;
-		PRESCAN_QSCORE_THRESH = 0.57;
-		Z_SCORE_MULT = 20;
-		MIN_QSCORE_MULT = 0.025;
-		MIN_SCORE_MULT = 0.15;
-		DYNAMIC_QSCORE_THRESH_PERFECT = 0.8;
-		DYNAMIC_QSCORE_THRESH = 0.6;
-		DYNAMIC_SCORE_THRESH = 0.84;
+		updatePrecision(true);
 	}
 
 	string genome_ref = argv[3];
 	string whole_genome;
 	bool read_index = createDirectories();
 	vector<Read> tmp_unaligned_reads;
+	vector<Read> tmp_aligned_reads;
 
 	int **res;
 	if(read_index) {
@@ -3309,11 +3049,12 @@ int main(int argc, char *argv[]) {
 	map<int, FastaRead> read_names;
 	map<int, Result> correct_results;
 	readReads(reads, read_names, correct_results, argv[2]);
+	vector<Result> results;
 
-	secondAlign(res, read_names, correct_results, whole_genome, reads, read_index, true, tmp_unaligned_reads);
+	secondAlign(res, read_names, correct_results, whole_genome, reads, read_index, tmp_unaligned_reads, tmp_aligned_reads, results);
 
 	string build = SSTR(build_number);
-	unsigned int cutoff = whole_genome.size();
+	unsigned int genome_size = whole_genome.size();
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
@@ -3321,21 +3062,21 @@ int main(int argc, char *argv[]) {
 	long startday2 = t1.tv_usec;
 
 	vector<int> coverage;
-	for(unsigned int i = 0; i < cutoff; i++) {
+	for(unsigned int i = 0; i < genome_size; i++) {
 		coverage.push_back(0);
 	}
-	calculateCoverageFromResults(coverage, outdir + "//" + "results" + build + ".txt");
-	writeCoverage(outdir + "//" + "coverage" + build + ".txt", coverage);
-	writeCoverageFiltered(outdir + "//" + "coverage" + build + ".cut", coverage);
+	//calculateCoverageFromResults(coverage, outdir + "//" + "results" + build + ".txt");
+	calculateCoverageFromVector(coverage, results);
+	//writeCoverageFiltered(outdir + "//" + "coverage" + build + ".cut", coverage);
 	gettimeofday(&t2, NULL);
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
 	long endday2 = t2.tv_usec;
 	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	gettimeofday(&t2, NULL);
-	cout << "Coverage written: " << timefinal << " seconds. " << endl;
+	cout << "Coverage calculated: " << timefinal << " seconds. " << endl;
 
-	drugi = true;
+	is_second_phase = true;
 
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
@@ -3351,9 +3092,7 @@ int main(int argc, char *argv[]) {
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "New ref written: " << timefinal << " seconds. " << endl;
 
-	cout << "part_genome: " << part_genome.size() << endl;
-
-	KEYLEN = 13;
+	KEYLEN = 10;
 	cout << "Creating second index..." << endl;
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
@@ -3365,42 +3104,21 @@ int main(int argc, char *argv[]) {
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 
 	cout << "Size of new ref: " << part_genome.size() << endl;
-
-	//readUnalignedReads(tmp_unaligned_reads, reads, outdir + "//" + "results" + build + ".txt");
-
 	cout << "Unaligned reads: " << tmp_unaligned_reads.size() << endl;
 
 	total_base_num = 0;
+	aligned_base_num = 0;
+
 	for(unsigned int i = 0; i < tmp_unaligned_reads.size(); i++) {
 		total_base_num += tmp_unaligned_reads[i].content.size();
 	}
 
-	aligned_base_num = 0;
+	vector<Read> final_unaligned_reads;
+	vector<Read> new_aligned_reads;
 
-	vector<Read> un_re;
-
-/*
-	MIN_QSCORE_MULT2 = 0.005;
-	PRESCAN_QSCORE_THRESH = 0.6 * 0.95;
-	Z_SCORE_MULT = 25;
-	MIN_QSCORE_MULT = 0.005;
-	MIN_SCORE_MULT = 0.02;
-	DYNAMIC_SCORE_THRESH = 0.64;
-	*/
-
-	secondAlign(res, read_names, correct_results, part_genome, tmp_unaligned_reads, false, false, un_re);
-
-	cout << positions_index[11590581] << endl;
-	cout << positions_index[11618588] << endl;
-
-	cout << "pos index: " << positions_index.size() << endl;
-
-	string ovo =  outdir + "//" + "posint" + build + ".txt";
-	ofstream posin(ovo.c_str());
-	for(unsigned int i = 0; i < positions_index.size(); i++) {
-		posin << positions_index[i] << " ";
-		if(i % 100 == 0) posin << endl;
-	}
+	results.clear();
+	secondAlign(res, read_names, correct_results, part_genome, tmp_unaligned_reads, false,
+			final_unaligned_reads, new_aligned_reads, results);
 
 	cout << "Program ended." << endl;
 
