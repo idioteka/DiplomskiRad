@@ -3,7 +3,8 @@
 #include "heap.h"
 #include "const.h";
 
-struct Statistic {
+
+struct Statistic2 {
 	int covered;
 	int reads;
 	int reads_with_result;
@@ -36,7 +37,7 @@ struct Statistic {
 	int start30;
 	int stop30;
 	int start_and_stop30;
-	Statistic(int num_reads) {
+	Statistic2(int num_reads) {
 		covered = 0,
 		reads = num_reads;
 		reads_with_result = 0;
@@ -78,8 +79,8 @@ struct Result {
 	int stop;
 	string matchString;
 	vector<int> gapArray;
-	int precise_start;
-	int precise_stop;
+	//int precise_start;
+	//int precise_stop;
 	Result(int br_, int start_, int stop_) {
 		br = br_;
 		start = start_;
@@ -310,7 +311,7 @@ void writeNewRef(string file, string file2, vector<int> &coverage, string &part_
 	unsigned int stop = 0;
 	unsigned int position = 0;
 	for(unsigned int i = 0; i < coverage.size(); i++) {
-		if(coverage[i] > 0) {
+		if(coverage[i] > COV_THRES) {
 			start = i;
 			stop = i;
 			position = i;
@@ -318,13 +319,13 @@ void writeNewRef(string file, string file2, vector<int> &coverage, string &part_
 		}
 	}
 	for(unsigned int i = position; i < coverage.size(); i++) {
-		if(coverage[i] > 0) {
+		if(coverage[i] > COV_THRES) {
 			if(stop + 32000 > i) {
 				stop = i;
 			}
 			else {
-				starts.push_back(start-100);
-				stops.push_back(stop + 100);
+				starts.push_back(start-COV_PADDING);
+				stops.push_back(stop + COV_PADDING);
 				start = i;
 				stop = i;
 			}
@@ -337,7 +338,7 @@ void writeNewRef(string file, string file2, vector<int> &coverage, string &part_
 		int pos3 = starts[i]-32000;
 		int pos4 = stops[i]+1;
 		out2 << "> " << starts[i] << "-" << stops[i] << endl;
-		for(int j = 0; j < 32000; j++) {
+		for(int j = 0; j < COV_GAPLEN; j++) {
 			positions.push_back(pos3);
 			part_genome += "N";
 			out2 << "N";
@@ -348,7 +349,7 @@ void writeNewRef(string file, string file2, vector<int> &coverage, string &part_
 			out2 << whole_genome[j];
 			part_genome.push_back(whole_genome[j]);
 		}
-		for(int j = 0; j < 32000; j++) {
+		for(int j = 0; j < COV_GAPLEN; j++) {
 			positions.push_back(pos4);
 			out2 << "N";
 			part_genome.push_back('N');
@@ -1718,8 +1719,8 @@ void traceback(string &read, string &ref, int refStartLoc, int refEndLoc, int ro
 
 	reverse(out.begin(),out.end());
 
-	r.precise_start = r.start-SLOW_ALIGN_PADDING + col;
-	r.precise_stop = r.stop+SLOW_ALIGN_PADDING -addon;
+//	r.precise_start = r.start-SLOW_ALIGN_PADDING + col;
+//	r.precise_stop = r.stop+SLOW_ALIGN_PADDING -addon;
 
 	if(gaps==0){
 		r.matchString = out;
@@ -1787,7 +1788,7 @@ void fillLimited(string &read, string &ref, int refStartLoc, int refEndLoc, int 
 
 	fillUnlimited(read, gref, 0, grefLimit, max, packed);
 	traceback(read, gref, 0, grefLimit, max[0], max[1], max[2], r, packed);
-	if(r.gapArray.size() == 0) r.precise_stop--;
+	//if(r.gapArray.size() == 0) r.precise_stop--;
 
 }
 
@@ -1796,8 +1797,8 @@ void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, 
 	if(ss.perfect) {
 		r.start = ss.start;
 		r.stop = ss.stop;
-		r.precise_start = r.start;
-		r.precise_stop = r.stop;
+	//	r.precise_start = r.start;
+	//	r.precise_stop = r.stop;
 		for(unsigned int i = 0; i < read.size(); i++) {
 			r.matchString.push_back('m');
 		}
@@ -1810,8 +1811,8 @@ void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, 
 	if(score > imperfectScore) {
 		r.start = ss.start;
 		r.stop = ss.stop;
-		r.precise_start = r.start;
-		r.precise_stop = r.stop;
+	//	r.precise_start = r.start;
+	//	r.precise_stop = r.stop;
 		r.matchString = match;
 		return;
 	}
@@ -2380,7 +2381,17 @@ int calculateOverlap(int start1, int stop1, int start2, int stop2) {
 	else return 0;
 }
 
-void calculateStatistics3(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
+void calculateStatistics3(Result &r1, Result &r2, Statistic &statistics) {
+
+	if(abs(r1.start-r2.start) < 15) {
+		statistics.start15++;
+	}
+	if(abs(r1.stop-r2.stop) < 15) {
+		statistics.stop15++;
+	}
+	if(abs(r1.start-r2.start) < 15 && abs(r1.stop-r2.stop) < 15) {
+		statistics.start_and_stop15++;
+	}
 	if(abs(r1.start-r2.start) < 30) {
 		statistics.start30++;
 	}
@@ -2390,9 +2401,37 @@ void calculateStatistics3(Result &r1, Result &r2, ofstream &out_stat, Statistic 
 	if(abs(r1.start-r2.start) < 30 && abs(r1.stop-r2.stop) < 30) {
 		statistics.start_and_stop30++;
 	}
+	if(abs(r1.start-r2.start) < 50) {
+		statistics.start50++;
+	}
+	if(abs(r1.stop-r2.stop) < 50) {
+		statistics.stop50++;
+	}
+	if(abs(r1.start-r2.start) < 50 && abs(r1.stop-r2.stop) < 50) {
+		statistics.start_and_stop50++;
+	}
+	if(abs(r1.start-r2.start) < 100) {
+		statistics.start100++;
+	}
+	if(abs(r1.stop-r2.stop) < 100) {
+		statistics.stop100++;
+	}
+	if(abs(r1.start-r2.start) < 100 && abs(r1.stop-r2.stop) < 100) {
+		statistics.start_and_stop100++;
+	}
 }
 
-void calculateStatistics5(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
+void calculateStatistics5(Result &r1, Result &r2, Statistic &statistics) {
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 15) {
+		statistics.start15++;
+	}
+	if(abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 15) {
+		statistics.stop15++;
+	}
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 15 && abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 15) {
+		statistics.start_and_stop15++;
+	}
+
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 30) {
 		statistics.start30++;
 	}
@@ -2402,269 +2441,233 @@ void calculateStatistics5(Result &r1, Result &r2, ofstream &out_stat, Statistic 
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 30 && abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 30) {
 		statistics.start_and_stop30++;
 	}
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 50) {
+		statistics.start50++;
+	}
+	if(abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 50) {
+		statistics.stop50++;
+	}
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 50 && abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 50) {
+		statistics.start_and_stop50++;
+	}
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 100) {
+		statistics.start100++;
+	}
+	if(abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 100) {
+		statistics.stop100++;
+	}
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 100 && abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 100) {
+		statistics.start_and_stop100++;
+	}
 }
 
-void calculateStatistics4(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
+void calculateStatistics4(Result &r1, Result &r2, Statistic &statistics) {
+
+	statistics.aligned_reads++;
 	int sum = 0;
-	//cout << "Calc stat 2" << endl;
 
 	if(r1.gapArray.size() == 0) {
 		r1.gapArray.push_back(r1.start);
 		r1.gapArray.push_back(r1.stop);
 	}
-	for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-		for(unsigned int j = 0; j < r1.gapArray.size(); j+=2) {
-			if(overlap(r2.gapArray[i], r2.gapArray[i+1], POSITIONS_INDEX[r1.gapArray[j]], POSITIONS_INDEX[r1.gapArray[j+1]])) {
-				int tmp = calculateOverlap(r2.gapArray[i], r2.gapArray[i+1], POSITIONS_INDEX[r1.gapArray[j]], POSITIONS_INDEX[r1.gapArray[j+1]]);
+	statistics.found_exons += r1.gapArray.size() / 2;
+	statistics.total_exons += r2.gapArray.size() / 2;
+	for(unsigned int i = 0; i < r1.gapArray.size(); i+=2) {
+		bool overlaped = false;
+		for(unsigned int j = 0; j < r2.gapArray.size(); j+=2) {
+			if(overlap(r2.gapArray[j], r2.gapArray[j+1], POSITIONS_INDEX[r1.gapArray[i]], POSITIONS_INDEX[r1.gapArray[i+1]])) {
+				int tmp = calculateOverlap(r2.gapArray[j], r2.gapArray[j+1], POSITIONS_INDEX[r1.gapArray[i]], POSITIONS_INDEX[r1.gapArray[i+1]]);
 				sum += tmp;
+				overlaped = true;
 			}
 		}
+		if(overlaped) {
+			statistics.overlaping_exons++;
+		}
 	}
-	statistics.covered += sum;
-
+	statistics.covered_bases += sum;
 }
 
 
-void calculateStatistics2(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
+void calculateStatistics2(Result &r1, Result &r2, Statistic &statistics) {
+
+	statistics.aligned_reads++;
+
 	int sum = 0;
-	//cout << "Calc stat 2" << endl;
 
 	if(r1.gapArray.size() == 0) {
 		r1.gapArray.push_back(r1.start);
 		r1.gapArray.push_back(r1.stop);
 	}
-	for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-		for(unsigned int j = 0; j < r1.gapArray.size(); j+=2) {
-			if(overlap(r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1])) {
-				int tmp = calculateOverlap(r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1]);
+	statistics.found_exons += r1.gapArray.size() / 2;
+	statistics.total_exons += r2.gapArray.size() / 2;
+	for(unsigned int i = 0; i < r1.gapArray.size(); i+=2) {
+		int num_over = 0;
+		bool overlaped = false;
+		for(unsigned int j = 0; j < r2.gapArray.size(); j+=2) {
+			if(overlap(r2.gapArray[j], r2.gapArray[j+1], r1.gapArray[i], r1.gapArray[i+1])) {
+				int tmp = calculateOverlap(r2.gapArray[j], r2.gapArray[j+1], r1.gapArray[i], r1.gapArray[i+1]);
 				sum += tmp;
+				num_over++;
+				overlaped = true;
 			}
 		}
+		if(overlaped) {
+			statistics.overlaping_exons++;
+		}
+		//if(num_over > 1) cout << "num over: " << num_over << endl;
 	}
-	statistics.covered += sum;
+	statistics.covered_bases += sum;
 
 }
 
-void calculateStatistics6(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
+void writeTotalStatistics(string infile, Statistic &statistic) {
+	ofstream out_stat(infile.c_str());
+	out_stat << "Total number of reads: " << statistic.total_reads << endl;
+	out_stat << "Number of aligned reads: " << statistic.aligned_reads << " - ";
+	out_stat << (100 * statistic.aligned_reads / (double) statistic.total_reads) << "%" << endl;
+	out_stat << "Unaligned number of reads: " << statistic.unaligned_reads << " - ";
+	out_stat << (100 * statistic.unaligned_reads / (double) statistic.total_reads) << "%" << endl;
 
-	//cout << "Calc stat 1" << endl,
-	statistics.reads_with_result++;
-	if(r2.gapArray.size() > 2) {
-		/*for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-			unsigned int start = r2.gapArray[i] - r2.start;
-			unsigned int stop = r2.gapArray[i+1] - r2.start;
-			if(start > r1.matchString.size()) break;
-			//cout << "greska -" << start << endl;
-			if(stop > r1.matchString.size()) stop = r1.matchString.size();
-			for(unsigned int j = start; j <= stop; j++) {
-				//if(r1.matchString[j] == 'm') statistics.gapped_percentage++;
-			}
-		}*/
+	out_stat <<	"Total number of exons: " << statistic.total_exons << endl;
+	out_stat << "Number of found exons: " << statistic.found_exons << " - ";
+	out_stat << (100 * (statistic.found_exons / (double) statistic.total_exons)) << "%" << endl;
+	out_stat << "Number of overlaping exons: " << statistic.overlaping_exons << " - ";
+	out_stat << (100 * (statistic.overlaping_exons / (double) statistic.found_exons)) << "%" << endl;
 
-	/*	for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-			for(unsigned int j = 0; j < r1.gapArray.size(); j+=2) {
-				if(overlap(r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1])) {
-					statistics.gapped_precise_percentage += calculateGappedPrecisePercentage(r1.precise_start, r1.precise_stop, r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1], r1.matchString);
-				}
-			}
-		}*/
+	out_stat << "Reads with correct starts (<15): " << statistic.start15 << " - ";
+	out_stat << (100 * statistic.start15 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct stops (<15): " << statistic.stop15 << " - ";
+	out_stat << (100 * statistic.stop15 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct starts and stops (<15): " << statistic.start_and_stop15 << " - ";
+	out_stat << (100 * statistic.start_and_stop15 / (double) statistic.aligned_reads) << "%" << endl;
 
-		statistics.gapped++;
-		if(POSITIONS_INDEX[r1.start] == r2.start) statistics.gapped_with_start++;
-		if(POSITIONS_INDEX[r1.stop] == r2.stop) statistics.gapped_with_stop++;
-		if(POSITIONS_INDEX[r1.start] == r2.start && POSITIONS_INDEX[r1.stop] == r2.stop) statistics.gapped_with_start_and_stop++;
-	//	if(positions_index[r1.precise_start] == r2.start) statistics.gapped_with_precise_start++;
-	//	if(positions_index[r1.precise_stop] == r2.stop) statistics.gapped_with_precise_stop++;
-	//	if(positions_index[r1.precise_start] == r2.start && positions_index[r1.precise_stop] == r2.stop) statistics.gapped_with_precise_start_and_stop++;
-	/*	if(r1.gapArray.size() == r2.gapArray.size()) {
-			for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-				statistics.exons++;
-				statistics.correct_exons++;
-				statistics.same_numbered_exons++;
-				if(r1.gapArray[i] == r2.gapArray[i]) statistics.correct_exon_start++;
-				if(r1.gapArray[i+1] == r2.gapArray[i+1]) statistics.correct_exon_stop++;
-				if(r1.gapArray[i] == r2.gapArray[i] && r1.gapArray[i+1] == r2.gapArray[i+1]) statistics.correct_exon_start_and_stop++;
-			}
-		}
-		else {
-			statistics.exons = statistics.exons + r1.gapArray.size()/2;
-			statistics.correct_exons = statistics.correct_exons + r2.gapArray.size()/2;
-		}*/
-	}
-	else {
-		statistics.ungapped++;
-		if(POSITIONS_INDEX[r1.start] == r2.start) statistics.ungapped_with_start++;
-		if(POSITIONS_INDEX[r1.stop] == r2.stop) statistics.ungapped_with_stop++;
-		if(POSITIONS_INDEX[r1.start] == r2.start && POSITIONS_INDEX[r1.stop] == r2.stop) statistics.ungapped_with_start_and_stop++;
-	//	if(positions_index[r1.precise_start] == r2.start) statistics.ungapped_with_precise_start++;
-	//	if(positions_index[r1.precise_stop] == r2.stop) statistics.ungapped_with_precise_stop++;
-	//	if(positions_index[r1.precise_start] == r2.start && positions_index[r1.precise_stop] == r2.stop) statistics.ungapped_with_precise_start_and_stop++;
-		/*for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-			unsigned int start = r2.gapArray[i] - r2.start;
-			unsigned int stop = r2.gapArray[i+1] - r2.start;
-			if(start > r1.matchString.size()) break;
-			//cout << "greska 2-" << start << endl ;
-			if(stop > r1.matchString.size()) stop = r1.matchString.size();
-			for(unsigned int j = start; j <= stop; j++) {
-				//if(r1.matchString[j] == 'm') statistics.ungapped_percentage++;
-			}
-		}*/
-		/*if(overlap(r2.gapArray[0], r2.gapArray[1], r1.precise_start, r1.precise_stop)) {
-			statistics.ungapped_precise_percentage += calculateGappedPrecisePercentage(r1.precise_start, r1.precise_stop, r2.gapArray[0], r2.gapArray[0+1], r1.precise_start, r1.precise_stop, r1.matchString);
-		}*/
 
-	}
-	statistics.percentage = statistics.gapped_percentage + statistics.ungapped_percentage;
-	statistics.precise_percentage = statistics.gapped_precise_percentage + statistics.ungapped_precise_percentage;
+	out_stat << "Reads with correct starts (<30): " << statistic.start30 << " - ";
+	out_stat << (100 * statistic.start30 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct stops (<30): " << statistic.stop30 << " - ";
+	out_stat << (100 * statistic.stop30 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct starts and stops (<30): " << statistic.start_and_stop30 << " - ";
+	out_stat << (100 * statistic.start_and_stop30 / (double) statistic.aligned_reads) << "%" << endl;
+
+	out_stat << "Reads with correct starts (<50): " << statistic.start50 << " - ";
+	out_stat << (100 * statistic.start50 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct stops (<50): " << statistic.stop50 << " - ";
+	out_stat << (100 * statistic.stop50 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct starts and stops (<50): " << statistic.start_and_stop50 << " - ";
+	out_stat << (100 * statistic.start_and_stop50 / (double) statistic.aligned_reads) << "%" << endl;
+
+	out_stat << "Reads with correct starts (<100): " << statistic.start100 << " - ";
+	out_stat << (100 * statistic.start100 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct stops (<100): " << statistic.stop100 << " - ";
+	out_stat << (100 * statistic.stop100 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct starts and stops (<100): " << statistic.start_and_stop100 << " - ";
+	out_stat << (100 * statistic.start_and_stop100 / (double) statistic.aligned_reads) << "%" << endl;
+
+	out_stat << "Total number of bases: " << statistic.total_bases << endl;
+	out_stat << "Number of covered bases: " << statistic.covered_bases << endl;
+	out_stat << "Percentage of covered bases of all reads: ";
+	out_stat << (100 * (statistic.covered_bases / (double) statistic.total_bases)) << "%" << endl;
+	out_stat << "Percentage of covered bases of aligned reads: ";
+	out_stat << (100 * (statistic.covered_bases / (double) statistic.aligned_bases)) << "%" << endl;
+
+	out_stat.close();
 
 }
 
-void calculateStatistics(Result &r1, Result &r2, ofstream &out_stat, Statistic &statistics) {
+void addTotalStatistics(vector<Result> &results, map<int, Result> &correct_results, Statistic &statistic) {
 
-	//cout << "Calc stat 1" << endl,
-	statistics.reads_with_result++;
-	if(r2.gapArray.size() > 2) {
-		/*for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-			unsigned int start = r2.gapArray[i] - r2.start;
-			unsigned int stop = r2.gapArray[i+1] - r2.start;
-			if(start > r1.matchString.size()) break;
-			//cout << "greska -" << start << endl;
-			if(stop > r1.matchString.size()) stop = r1.matchString.size();
-			for(unsigned int j = start; j <= stop; j++) {
-				//if(r1.matchString[j] == 'm') statistics.gapped_percentage++;
-			}
-		}*/
+	statistic.aligned_bases += ALIGNED_BASE_NUM;
 
-	/*	for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-			for(unsigned int j = 0; j < r1.gapArray.size(); j+=2) {
-				if(overlap(r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1])) {
-					statistics.gapped_precise_percentage += calculateGappedPrecisePercentage(r1.precise_start, r1.precise_stop, r2.gapArray[i], r2.gapArray[i+1], r1.gapArray[j], r1.gapArray[j+1], r1.matchString);
-				}
-			}
-		}*/
+	for(unsigned int i = 0; i < results.size(); i++) {
+		Result r1 = results[i];
+		map<int, Result>::iterator pos = correct_results.find(r1.br);
+		Result r2 = pos->second;
 
-		statistics.gapped++;
-		if(r1.start == r2.start) statistics.gapped_with_start++;
-		if(r1.stop == r2.stop) statistics.gapped_with_stop++;
-		if(r1.start == r2.start && r1.stop == r2.stop) statistics.gapped_with_start_and_stop++;
-		if(r1.precise_start == r2.start) statistics.gapped_with_precise_start++;
-		if(r1.precise_stop == r2.stop) statistics.gapped_with_precise_stop++;
-		if(r1.precise_start == r2.start && r1.precise_stop == r2.stop) statistics.gapped_with_precise_start_and_stop++;
-	/*	if(r1.gapArray.size() == r2.gapArray.size()) {
-			for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-				statistics.exons++;
-				statistics.correct_exons++;
-				statistics.same_numbered_exons++;
-				if(r1.gapArray[i] == r2.gapArray[i]) statistics.correct_exon_start++;
-				if(r1.gapArray[i+1] == r2.gapArray[i+1]) statistics.correct_exon_stop++;
-				if(r1.gapArray[i] == r2.gapArray[i] && r1.gapArray[i+1] == r2.gapArray[i+1]) statistics.correct_exon_start_and_stop++;
-			}
+		if(IS_SECOND_PHASE) {
+			calculateStatistics4(r1, r2, statistic);
+			calculateStatistics5(r1, r2, statistic);
+		} else {
+			calculateStatistics2(r1, r2, statistic);
+			calculateStatistics3(r1, r2, statistic);
 		}
-		else {
-			statistics.exons = statistics.exons + r1.gapArray.size()/2;
-			statistics.correct_exons = statistics.correct_exons + r2.gapArray.size()/2;
-		}*/
 	}
-	else {
-		statistics.ungapped++;
-		if(r1.start == r2.start) statistics.ungapped_with_start++;
-		if(r1.stop == r2.stop) statistics.ungapped_with_stop++;
-		if(r1.start == r2.start && r1.stop == r2.stop) statistics.ungapped_with_start_and_stop++;
-		if(r1.precise_start == r2.start) statistics.ungapped_with_precise_start++;
-		if(r1.precise_stop == r2.stop) statistics.ungapped_with_precise_stop++;
-		if(r1.precise_start == r2.start && r1.precise_stop == r2.stop) statistics.ungapped_with_precise_start_and_stop++;
-		/*for(unsigned int i = 0; i < r2.gapArray.size(); i+=2) {
-			unsigned int start = r2.gapArray[i] - r2.start;
-			unsigned int stop = r2.gapArray[i+1] - r2.start;
-			if(start > r1.matchString.size()) break;
-			//cout << "greska 2-" << start << endl ;
-			if(stop > r1.matchString.size()) stop = r1.matchString.size();
-			for(unsigned int j = start; j <= stop; j++) {
-				//if(r1.matchString[j] == 'm') statistics.ungapped_percentage++;
-			}
-		}*/
-		/*if(overlap(r2.gapArray[0], r2.gapArray[1], r1.precise_start, r1.precise_stop)) {
-			statistics.ungapped_precise_percentage += calculateGappedPrecisePercentage(r1.precise_start, r1.precise_stop, r2.gapArray[0], r2.gapArray[0+1], r1.precise_start, r1.precise_stop, r1.matchString);
-		}*/
 
-	}
-	statistics.percentage = statistics.gapped_percentage + statistics.ungapped_percentage;
-	statistics.precise_percentage = statistics.gapped_precise_percentage + statistics.ungapped_precise_percentage;
+	statistic.unaligned_reads = statistic.total_reads - statistic.aligned_reads;
+
 
 }
 
 void writeStatistics(vector<Result> &results, map<int, Result> &correct_results, string infile, Statistic &statistic) {
 	ofstream out_stat(infile.c_str());
 
+	statistic.total_bases = TOTAL_BASE_NUM;
+	statistic.aligned_bases = ALIGNED_BASE_NUM;
+
 	for(unsigned int i = 0; i < results.size(); i++) {
 		Result r1 = results[i];
 		map<int, Result>::iterator pos = correct_results.find(r1.br);
 		Result r2 = pos->second;
-		if(IS_SECOND_PHASE == false) {
-		calculateStatistics(r1, r2, out_stat, statistic);
-		}
-		//cout << "1" << endl;
+
 		if(IS_SECOND_PHASE) {
-			calculateStatistics6(r1, r2, out_stat, statistic);
-			calculateStatistics4(r1, r2, out_stat, statistic);
-			calculateStatistics5(r1, r2, out_stat, statistic);
+			calculateStatistics4(r1, r2, statistic);
+			calculateStatistics5(r1, r2, statistic);
 		} else {
-		calculateStatistics2(r1, r2, out_stat, statistic);
-		//cout << "2" << endl;
-		calculateStatistics3(r1, r2, out_stat, statistic);
-		//cout << "3" << endl;
+			calculateStatistics2(r1, r2, statistic);
+			calculateStatistics3(r1, r2, statistic);
 		}
 	}
 
-	//cout << "gotovo" << endl;
+	statistic.unaligned_reads = statistic.total_reads - statistic.aligned_reads;
 
-	double percentage = statistic.percentage / (double) statistic.reads_with_result;
-	double precise_percentage = statistic.precise_percentage / (double) statistic.reads_with_result;
-	double gapped_percentage = statistic.gapped_percentage / (double) statistic.gapped;
-	double gapped_precise_percentage = statistic.gapped_precise_percentage / (double) statistic.gapped;
-	double ungapped_percentage = statistic.ungapped_percentage / (double) statistic.ungapped;
-	double ungapped_precise_percentage = statistic.ungapped_precise_percentage / (double) statistic.ungapped;
+	out_stat << "Total number of reads: " << statistic.total_reads << endl;
+	out_stat << "Number of aligned reads: " << statistic.aligned_reads << " - ";
+	out_stat << (100 * statistic.aligned_reads / (double) statistic.total_reads) << "%" << endl;
+	out_stat << "Unaligned number of reads: " << statistic.unaligned_reads << " - ";
+	out_stat << (100 * statistic.unaligned_reads / (double) statistic.total_reads) << "%" << endl;
 
-	out_stat << "reads: " << statistic.reads << endl;
-	out_stat << "reads_with_result: " << statistic.reads_with_result / SPLIT_COUNT << endl;
-	out_stat << "gapped: " << statistic.gapped << endl;
-	out_stat << "ungapped: " << statistic.ungapped << endl;
-	out_stat << "gapped_with_start: " << statistic.gapped_with_start << endl;
-	out_stat << "gapped_with_stop: " << statistic.gapped_with_stop << endl;
-	out_stat << "gapped_with_start_and_stop: " << statistic.gapped_with_start_and_stop << endl;
-	out_stat << "gapped_with_precise_start: " << statistic.gapped_with_precise_start << endl;
-	out_stat << "gapped_with_precise_stop: " << statistic.gapped_with_precise_stop << endl;
-	out_stat << "gapped_with_precise_start_and_stop: " << statistic.gapped_with_precise_start_and_stop << endl;
-	out_stat << "ungapped_with_start: " << statistic.ungapped_with_start << endl;
-	out_stat << "ungapped_with_stop: " << statistic.ungapped_with_stop << endl;
-	out_stat << "ungapped_with_start_and_stop: " << statistic.ungapped_with_start_and_stop << endl;
-	out_stat << "ungapped_with_precise_start: " << statistic.ungapped_with_precise_start << endl;
-	out_stat << "ungapped_with_precise_stop: " << statistic.ungapped_with_precise_stop << endl;
-	out_stat << "ungapped_with_precise_start_and_stop: " << statistic.ungapped_with_precise_start_and_stop << endl;
-	out_stat << "exons: " << statistic.exons << endl;
-	out_stat << "correct_exons: " << statistic.correct_exons << endl;
-	out_stat << "same_numbered_exons: " << statistic.same_numbered_exons << endl;
-	out_stat << "correct_exon_start: " << statistic.correct_exon_start << endl;
-	out_stat << "correct_exon_stop: " << statistic.correct_exon_stop << endl;
-	out_stat << "correct_exon_start_and_stop: " << statistic.correct_exon_start_and_stop << endl;
-	out_stat << "correct_bases: " << statistic.percentage << endl;
-	out_stat << "percentage: " << percentage << endl;
-	out_stat << "precise_correct_bases: " << statistic.precise_percentage << endl;
-	out_stat << "precise_percentage: " << precise_percentage << endl;
-	out_stat << "ungapped_correct_bases: " << statistic.ungapped_percentage << endl;
-	out_stat << "ungapped_percentage: " << ungapped_percentage << endl;
-	out_stat << "ungapped_precise_correct_bases: " << statistic.ungapped_precise_percentage << endl;
-	out_stat << "ungapped_precise_percentage: " << ungapped_precise_percentage << endl;
-	out_stat << "gapped_correct_bases: " << statistic.gapped_percentage << endl;
-	out_stat << "gapped_percentage: " << gapped_percentage << endl;
-	out_stat << "gapped_precise_correct_bases: " << statistic.gapped_precise_percentage << endl;
-	out_stat << "gapped_precise_percentage: " << gapped_precise_percentage << endl;
-	out_stat << "covered: " << statistic.covered << endl;
-	out_stat << "covered by aligned reads: " << 100 * (statistic.covered / (double) ALIGNED_BASE_NUM) << "%" << endl;
-	out_stat << "covered by total reads: " << 100 * (statistic.covered / (double) TOTAL_BASE_NUM) << "%" << endl;
-	out_stat << "start30: " << statistic.start30 << endl;
-	out_stat << "stop30: " << statistic.stop30 << endl;
-	out_stat << "start_and_stop30: " << statistic.start_and_stop30 << endl;
+	out_stat <<	"Total number of exons: " << statistic.total_exons << endl;
+	out_stat << "Number of found exons: " << statistic.found_exons << " - ";
+	out_stat << (100 * (statistic.found_exons / (double) statistic.total_exons)) << "%" << endl;
+	out_stat << "Number of overlaping exons: " << statistic.overlaping_exons << " - ";
+	out_stat << (100 * (statistic.overlaping_exons / (double) statistic.found_exons)) << "%" << endl;
+
+	out_stat << "Reads with correct starts (<15): " << statistic.start15 << " - ";
+	out_stat << (100 * statistic.start15 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct stops (<15): " << statistic.stop15 << " - ";
+	out_stat << (100 * statistic.stop15 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct starts and stops (<15): " << statistic.start_and_stop15 << " - ";
+	out_stat << (100 * statistic.start_and_stop15 / (double) statistic.aligned_reads) << "%" << endl;
+
+
+	out_stat << "Reads with correct starts (<30): " << statistic.start30 << " - ";
+	out_stat << (100 * statistic.start30 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct stops (<30): " << statistic.stop30 << " - ";
+	out_stat << (100 * statistic.stop30 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct starts and stops (<30): " << statistic.start_and_stop30 << " - ";
+	out_stat << (100 * statistic.start_and_stop30 / (double) statistic.aligned_reads) << "%" << endl;
+
+	out_stat << "Reads with correct starts (<50): " << statistic.start50 << " - ";
+	out_stat << (100 * statistic.start50 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct stops (<50): " << statistic.stop50 << " - ";
+	out_stat << (100 * statistic.stop50 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct starts and stops (<50): " << statistic.start_and_stop50 << " - ";
+	out_stat << (100 * statistic.start_and_stop50 / (double) statistic.aligned_reads) << "%" << endl;
+
+	out_stat << "Reads with correct starts (<100): " << statistic.start100 << " - ";
+	out_stat << (100 * statistic.start100 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct stops (<100): " << statistic.stop100 << " - ";
+	out_stat << (100 * statistic.stop100 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << "Reads with correct starts and stops (<100): " << statistic.start_and_stop100 << " - ";
+	out_stat << (100 * statistic.start_and_stop100 / (double) statistic.aligned_reads) << "%" << endl;
+
+	out_stat << "Total number of bases: " << statistic.total_bases << endl;
+	out_stat << "Number of covered bases: " << statistic.covered_bases << endl;
+	out_stat << "Percentage of covered bases of all reads: ";
+	out_stat << (100 * (statistic.covered_bases / (double) statistic.total_bases)) << "%" << endl;
+	out_stat << "Percentage of covered bases of aligned reads: ";
+	out_stat << (100 * (statistic.covered_bases / (double) statistic.aligned_bases)) << "%" << endl;
+
 	out_stat.close();
 
 }
@@ -2677,7 +2680,7 @@ void *preProcessRead(void *threadid) {
 		Read read = (*(td->reads))[i];
 
 		if(true) {
-			if((i+1)%10 == 0) cout << "Read: " << read.br << " started." << endl;
+		//	if((i+1)%10 == 0) cout << "Read: " << read.br << " started." << endl;
 		}
 		/*if((i+1)%10 == 0)*/ //cout << "Read: " << read.br << " started." << endl;
 		processRead(td->sizes, td->sites, read.content, *(td->results), *(td->aligned_reads), *(td->unaligned_reads), *(td->whole_genome),  td->thread_id, read.br);
@@ -2695,6 +2698,7 @@ void checkParameter(string command, string value) {
 	if(strcmp(command.c_str(), "-t") == 0) {
 		THREAD_NUM = atoi(value.c_str());
 		cout << "Number of threads set to " << THREAD_NUM << "." << endl;
+		info.number_of_threads = THREAD_NUM;
 	}
 	else if(strcmp(command.c_str(), "-i") == 0) {
 		INDEX_LOCATION = value;
@@ -2715,12 +2719,59 @@ void checkParameter(string command, string value) {
 		SPLIT_COUNT = atoi(value.c_str());
 		cout << "Reads will be split at " << value << " parts." << endl;
 	}
+	else if(strcmp(command.c_str(), "-ss") == 0) {
+		SECOND_PHASE_SPLIT_COUNT = atoi(value.c_str());
+		cout << "In second phase reads will further be split at " << value << " parts." << endl;
+	}
 	else if(strcmp(command.c_str(), "-k") == 0) {
 		KEYLEN = atoi(value.c_str());
 		cout << "KEYLEN set to " << value << "." << endl;
+		info.first_phase_keylen = KEYLEN;
+	}
+	else if(strcmp(command.c_str(), "-k2") == 0) {
+		KEYLEN2 = atoi(value.c_str());
+		cout << "KEYLEN2 set to " << value << "." << endl;
+		info.second_phase_keylen = KEYLEN2;
 	}
 	else if(strcmp(command.c_str(), "-p") == 0) {
 		PRECISE = false;
+		cout << "Set to low precision." << endl;
+		info.first_phase_precision = PRECISE;
+	}
+	else if(strcmp(command.c_str(), "-sp") == 0) {
+		SECOND_PHASE_PRECISE = false;
+		cout << "Secon phase set to low precision." << endl;
+		info.second_phase_precision = SECOND_PHASE_PRECISE;
+	}
+	else if(strcmp(command.c_str(), "-mi") == 0) {
+		MAX_INDEL2 = atoi(value.c_str());
+		cout << "Max indel set to " << value << "." << endl;
+		info.first_phase_max_indel = MAX_INDEL2;
+	}
+	else if(strcmp(command.c_str(), "-smi") == 0) {
+		SECOND_PHASE_MAX_INDEL2 = atoi(value.c_str());
+		cout << "Second phase max indel set to " << value << "." << endl;
+		info.second_phase_max_indel = SECOND_PHASE_MAX_INDEL2;
+	}
+	else if(strcmp(command.c_str(), "-ct") == 0) {
+		COV_THRES = atoi(value.c_str());
+		cout << "Coverage threshold set to " << value << "." << endl;
+		info.coverage_threshold = COV_THRES;
+	}
+	else if(strcmp(command.c_str(), "-cp") == 0) {
+		COV_PADDING = atoi(value.c_str());
+		cout << "Coverage padding set to " << value << "." << endl;
+		info.coverage_padding = COV_PADDING;
+	}
+	else if(strcmp(command.c_str(), "-cg") == 0) {
+		COV_GAPLEN = atoi(value.c_str());
+		cout << "Coverage gaplen set to " << value << "." << endl;
+		info.coverage_gaplen = COV_GAPLEN;
+	}
+	else if(strcmp(command.c_str(), "-spm") == 0) {
+		SECOND_PHASE_MODE = atoi(value.c_str());
+		cout << "Second phase mode set to " << value << "." << endl;
+		info.second_phase_mode = SECOND_PHASE_MODE;
 	}
 	else {
 		cout << "Parameter " << command << " not recognized." << endl;
@@ -2729,7 +2780,7 @@ void checkParameter(string command, string value) {
 }
 
 int readParams(int argc, char *argv[]) {
-	if(argc != 4 && argc != 6 && argc != 8 && argc != 10 && argc != 12 && argc != 14 && argc != 16 && argc != 18) {
+	if(argc < 4) {
 		cout << "Program must run with arguments: <destination_folder> <reads_file> <genome_reference_file> -t <thread_number> -i <index_location> -c <create_index>" << endl;
 		cout << "<destination_folder> - folder where results will be stored." << endl;
 		cout << "<reads_file> - file with reads in fasta format." << endl;
@@ -2768,47 +2819,8 @@ int readParams(int argc, char *argv[]) {
 
 	INDEX_LOCATION = OUTDIR;
 
-	if(argc == 6) {
-		checkParameter(argv[4], argv[5]);
-	}
-	if(argc == 8) {
-		checkParameter(argv[4], argv[5]);
-		checkParameter(argv[6], argv[7]);
-	}
-	if(argc == 10) {
-		checkParameter(argv[4], argv[5]);
-		checkParameter(argv[6], argv[7]);
-		checkParameter(argv[8], argv[9]);
-	}
-	if(argc == 12) {
-		checkParameter(argv[4], argv[5]);
-		checkParameter(argv[6], argv[7]);
-		checkParameter(argv[8], argv[9]);
-		checkParameter(argv[10], argv[11]);
-	}
-	if(argc == 14) {
-		checkParameter(argv[4], argv[5]);
-		checkParameter(argv[6], argv[7]);
-		checkParameter(argv[8], argv[9]);
-		checkParameter(argv[10], argv[11]);
-		checkParameter(argv[12], argv[13]);
-	}
-	if(argc == 16) {
-		checkParameter(argv[4], argv[5]);
-		checkParameter(argv[6], argv[7]);
-		checkParameter(argv[8], argv[9]);
-		checkParameter(argv[10], argv[11]);
-		checkParameter(argv[12], argv[13]);
-		checkParameter(argv[14], argv[15]);
-	}
-	if(argc == 18) {
-		checkParameter(argv[4], argv[5]);
-		checkParameter(argv[6], argv[7]);
-		checkParameter(argv[8], argv[9]);
-		checkParameter(argv[10], argv[11]);
-		checkParameter(argv[12], argv[13]);
-		checkParameter(argv[14], argv[15]);
-		checkParameter(argv[16], argv[17]);
+	for(int i = 0; i < (argc - 4)/2 ; i++) {
+		checkParameter(argv[4 + i*2], argv[5 + i*2]);
 	}
 	return 1;
 }
@@ -2977,8 +2989,15 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	Statistic s = Statistic(reads.size());
+	Statistic s = Statistic(reads.size() * SPLIT_COUNT);
 	writeStatistics(tmp_results, correct_results, OUTDIR + "//" + "statistics" + addon + build + ".txt", s);
+	if(!SECOND_PHASE_MODE && !IS_SECOND_PHASE) {
+		addTotalStatistics(tmp_results, correct_results, global_stat);
+	}
+	if(IS_SECOND_PHASE) {
+		addTotalStatistics(tmp_results, correct_results, global_stat);
+		writeTotalStatistics(OUTDIR + "//" + "statistics" + "t" + build + ".txt", global_stat);
+	}
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
@@ -3049,17 +3068,55 @@ void updatePrecision(bool prec) {
 	}
 }
 
+void writeInfo() {
+	string filename = OUTDIR + "//" + "align.info";
+	ofstream out_info(filename.c_str());
+
+	string precision = " precision set to low.";
+	string second_phase_precision = " precision set to low.";
+	if(info.first_phase_precision) {
+		precision = " precision set to high.";
+	}
+	if(info.second_phase_precision) {
+		second_phase_precision = " precision set to high.";
+	}
+	string mode = " unaligned reads processed.";
+	if(info.second_phase_mode) {
+		mode = " all reads processed.";
+	}
+
+	out_info << "Elapsed execution time: " << info.total_execution_time << " seconds." << endl;
+	out_info << "Thread number: " << info.number_of_threads << endl;
+	out_info << "Whole genome size: " << info.genome_size << " bases." << endl;
+	out_info << "Total number of reads: " << info.read_number << endl;
+	out_info << "Number of aligned reads: " << info.aligned_read_number << endl;
+	out_info << "First phase data: " << endl;
+	out_info << "\t - keylen: " << info.first_phase_keylen << endl;
+	out_info << "\t - max indel: " << info.first_phase_max_indel << endl;
+	out_info << "\t -" << precision << endl;
+	out_info << "\t - read length: " << info.first_phase_readlen << endl;
+	out_info << "Second phase data: " << endl;
+	out_info << "\t - keylen: " << info.second_phase_keylen << endl;
+	out_info << "\t - max indel: " << info.second_phase_max_indel << endl;
+	out_info << "\t -" << second_phase_precision << endl;
+	out_info << "\t - read length: " << info.second_phase_readlen << endl;
+	out_info << "\t -" << mode << endl;
+	out_info << "Coverage gaplen: " << info.coverage_gaplen << endl;
+	out_info << "Coverage cutoff: " << info.coverage_threshold << endl;
+	out_info << "Coverage padding: " << info.coverage_padding << endl;
+	out_info << "New reference size: " << info.new_ref_size << endl;
+}
+
 int main(int argc, char *argv[]) {
+
+	timeval t3, t4;
+	gettimeofday(&t3, NULL);
+	long startday3 = t3.tv_sec;
+	long startday4 = t3.tv_usec;
 
 	if(readParams(argc, argv) < 0) exit(-1);
 
-	updatePrecision(true);
-	if(PRECISE) {
-		updatePrecision(true);
-	}
-	else {
-		updatePrecision(false);
-	}
+	updatePrecision(PRECISE);
 
 	string genome_ref = argv[3];
 	string whole_genome;
@@ -3078,12 +3135,19 @@ int main(int argc, char *argv[]) {
 	}
 
 	cout << "genome size: " << whole_genome.size() << endl;
+	info.genome_size = whole_genome.size();
 
 	vector<Read> reads;
 	map<int, FastaRead> read_names;
 	map<int, Result> correct_results;
 	readReads(reads, read_names, correct_results, argv[2]);
 	vector<Result> results;
+
+	global_stat.total_reads = reads.size();
+	global_stat.total_bases = TOTAL_BASE_NUM;
+
+	info.read_number = reads.size();
+	info.first_phase_readlen = reads[0].content.size() / SPLIT_COUNT;
 
 	secondAlign(res, read_names, correct_results, whole_genome, reads, read_index, tmp_unaligned_reads, tmp_aligned_reads, results);
 
@@ -3126,7 +3190,7 @@ int main(int argc, char *argv[]) {
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "New ref written: " << timefinal << " seconds. " << endl;
 
-	KEYLEN = 13;
+	KEYLEN = KEYLEN2;
 	cout << "Creating second index..." << endl;
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
@@ -3140,19 +3204,53 @@ int main(int argc, char *argv[]) {
 	cout << "Size of new ref: " << part_genome.size() << endl;
 	cout << "Unaligned reads: " << tmp_unaligned_reads.size() << endl;
 
+	info.new_ref_size = part_genome.size();
+	//info.aligned_read_number += tmp_aligned_reads.size();
+
 	TOTAL_BASE_NUM = 0;
 	ALIGNED_BASE_NUM = 0;
 
-	for(unsigned int i = 0; i < tmp_unaligned_reads.size(); i++) {
-		TOTAL_BASE_NUM += tmp_unaligned_reads[i].content.size();
+	if(SECOND_PHASE_MODE) {
+		for(unsigned int i = 0; i < reads.size(); i++) {
+			TOTAL_BASE_NUM += reads[i].content.size();
+		}
+	}
+	else {
+		for(unsigned int i = 0; i < tmp_unaligned_reads.size(); i++) {
+			TOTAL_BASE_NUM += tmp_unaligned_reads[i].content.size();
+		}
 	}
 
 	vector<Read> final_unaligned_reads;
 	vector<Read> new_aligned_reads;
 
+	SPLIT_COUNT = SECOND_PHASE_SPLIT_COUNT;
+	MAX_INDEL = SECOND_PHASE_MAX_INDEL2;
+
+	info.second_phase_readlen = tmp_unaligned_reads[0].content.size() / SPLIT_COUNT;
+
+	updatePrecision(SECOND_PHASE_PRECISE);
+
 	results.clear();
-	secondAlign(res, read_names, correct_results, part_genome, tmp_unaligned_reads, false,
+
+	if(SECOND_PHASE_MODE) {
+		secondAlign(res, read_names, correct_results, part_genome, reads, false,
 			final_unaligned_reads, new_aligned_reads, results);
+	}
+	else {
+		secondAlign(res, read_names, correct_results, part_genome, tmp_unaligned_reads, false,
+			final_unaligned_reads, new_aligned_reads, results);
+	}
+
+	info.aligned_read_number = info.read_number - final_unaligned_reads.size();
+
+	gettimeofday(&t4, NULL);
+	long endday3 = t4.tv_sec;
+	long endday4 = t4.tv_usec;
+	double timefinal2 = ((endday3 - startday3) * 1000000.0 + (endday4 - startday4))/ 1000000;
+
+	writeInfo();
+	info.total_execution_time = timefinal2;
 
 	cout << "Program ended." << endl;
 

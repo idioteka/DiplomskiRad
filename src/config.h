@@ -24,17 +24,119 @@ using namespace std;
 #define SSTR( x ) dynamic_cast< std::ostringstream & >( \
         ( std::ostringstream() << std::dec << x ) ).str()
 
+struct Statistic {
+	int total_reads;
+	int aligned_reads;
+	int unaligned_reads;
+	int start15;
+	int stop15;
+	int start_and_stop15;
+	int start30;
+	int stop30;
+	int start_and_stop30;
+	int start50;
+	int stop50;
+	int start_and_stop50;
+	int start100;
+	int stop100;
+	int start_and_stop100;
+	int total_exons;
+	int overlaping_exons;
+	int found_exons;
+	int total_bases;
+	int aligned_bases;
+	int covered_bases;
+	Statistic() {
+	}
+	Statistic(int num_reads) {
+		total_reads = num_reads;
+		aligned_reads = 0;
+		unaligned_reads = 0;
+		start15 = 0;
+		stop15 = 0;
+		start_and_stop15 = 0;
+		start30 = 0;
+		stop30 = 0;
+		start_and_stop30 = 0;
+		start50 = 0;
+		stop50 = 0;
+		start_and_stop50 = 0;
+		start100 = 0;
+		stop100 = 0;
+		start_and_stop100 = 0;
+		total_exons = 0;
+		overlaping_exons = 0;
+		found_exons = 0;
+		total_bases = 0;
+		aligned_bases = 0;
+		covered_bases = 0;
+	}
+};
+
+
+struct Info {
+	int read_number;
+	int aligned_read_number;
+	int genome_size;
+	double total_execution_time;
+	bool first_phase_precision;
+	bool second_phase_precision;
+	int first_phase_readlen;
+	int second_phase_readlen;
+	int first_phase_keylen;
+	int second_phase_keylen;
+	int first_phase_max_indel;
+	int second_phase_max_indel;
+	int coverage_threshold;
+	int coverage_gaplen;
+	int coverage_padding;
+	int second_phase_mode;
+	int new_ref_size;
+	int number_of_threads;
+	Info() {
+		read_number = 0;
+		aligned_read_number = 0;
+		genome_size = 0;
+		total_execution_time = 0;
+		first_phase_precision = true;
+		second_phase_precision = true;
+		first_phase_readlen = 0;
+		second_phase_readlen = 0;
+		first_phase_keylen = 13;
+		second_phase_keylen = 13;
+		first_phase_max_indel = 32000;
+		second_phase_max_indel = 32000;
+		coverage_threshold = 0;
+		coverage_gaplen = 32000;
+		coverage_padding = 100;
+		second_phase_mode = 0;
+		new_ref_size = 0;
+		number_of_threads = 4;
+	}
+};
+
+static Info info;
+static Statistic global_stat;
+
 //	PROGRAM CONST
 static int THREAD_NUM = 4;
 static bool PRECISE = true;
 static bool IS_SECOND_PHASE = false;
 static int KEYLEN = 13;
+static int KEYLEN2 = 13;
 static int KEYSPACE = pow(2, 2*KEYLEN);
 static vector<int> POSITIONS_INDEX;
 static int SPLIT_COUNT = 1;
+static int SECOND_PHASE_SPLIT_COUNT = 1;
 static int TOTAL_BASE_NUM = 0;
 static int ALIGNED_BASE_NUM = 0;
 static int BUILD_NUMBER = 1;
+static int COV_THRES = 1;
+static int COV_PADDING = 100;
+static int COV_GAPLEN = 32000;
+static int SECOND_PHASE_MODE = 0;
+static bool SECOND_PHASE_PRECISE  = true;
+static int SECOND_PHASE_MAX_INDEL2 = 32000;
 
 //	INDEX CONST
 static string OUTDIR;
@@ -69,7 +171,7 @@ static float DYNAMIC_QSCORE_THRESH_PERFECT = 0.8;
 static float DYNAMIC_QSCORE_THRESH = 0.6;
 static float DYNAMIC_SCORE_THRESH = 0.64;
 static int MAX_INDEL = 16000;
-static int MAX_INDEL2 = 16000;
+static int MAX_INDEL2 = 32000;
 static float PRESCAN_QSCORE_THRESH = 0.6 * 0.95;
 
 static int SLOW_ALIGN_PADDING = 6;
