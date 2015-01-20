@@ -31,21 +31,26 @@ struct Statistic {
 	int start15;
 	int stop15;
 	int start_and_stop15;
+	int start_or_stop15;
 	int start30;
 	int stop30;
 	int start_and_stop30;
+	int start_or_stop30;
 	int start50;
 	int stop50;
 	int start_and_stop50;
+	int start_or_stop50;
 	int start100;
 	int stop100;
 	int start_and_stop100;
+	int start_or_stop100;
 	int total_exons;
 	int overlaping_exons;
 	int found_exons;
 	int total_bases;
 	int aligned_bases;
 	int covered_bases;
+	int finded_bases;
 	Statistic() {
 	}
 	Statistic(int num_reads) {
@@ -55,21 +60,26 @@ struct Statistic {
 		start15 = 0;
 		stop15 = 0;
 		start_and_stop15 = 0;
+		start_or_stop15 = 0;
 		start30 = 0;
 		stop30 = 0;
 		start_and_stop30 = 0;
+		start_or_stop30 = 0;
 		start50 = 0;
 		stop50 = 0;
 		start_and_stop50 = 0;
+		start_or_stop50 = 0;
 		start100 = 0;
 		stop100 = 0;
 		start_and_stop100 = 0;
+		start_or_stop100 = 0;
 		total_exons = 0;
 		overlaping_exons = 0;
 		found_exons = 0;
 		total_bases = 0;
 		aligned_bases = 0;
 		covered_bases = 0;
+		finded_bases = 0;
 	}
 };
 

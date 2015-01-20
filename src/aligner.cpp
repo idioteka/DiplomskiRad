@@ -424,8 +424,16 @@ void calculateCoverageFromVector(vector<int> &coverage, vector<Result> &results)
 			cout << "read: " << r.br << endl;
 		}*/
 		for(unsigned int k = 0; k < r.gapArray.size(); k+=2) {
-			int start = r.gapArray[k];
-			int stop = r.gapArray[k+1];
+			int start;
+			int stop;
+			if(IS_SECOND_PHASE) {
+				start = POSITIONS_INDEX[r.gapArray[k]];
+				stop = POSITIONS_INDEX[r.gapArray[k+1]];
+			}
+			else {
+				start = r.gapArray[k];
+				stop = r.gapArray[k+1];
+			}
 			for(int l = start; l <= stop; l++) {
 				coverage[l] = coverage[l]+1;
 			}
@@ -1017,8 +1025,42 @@ int extendScore(string &read, vector<int> &offsets, vector<int> &values, int cen
 			loc_array[i] = -2;
 		}
 	}
+//
+	//int minsite = loc_array[0];
+	//int maxsite = loc_array[loc_array.size()-1];
+	int maxsite = 0;
+	for(unsigned int i = loc_array.size()-1; i > 0; i--) {
+		if(loc_array[i] > -1) {
+			maxsite = loc_array[i];
+			break;
+		}
+	}
+
+
+	int minsite = 0;
+	for(unsigned int i = 0; i < loc_array.size(); i++) {
+		if(loc_array[i] > -1) {
+			minsite = loc_array[i];
+			break;
+		}
+	}
+
+	//cout << "minsite: " << minsite << endl;
+	//cout << "maxsite: " << maxsite << endl;
+	for(unsigned int i = 0; i < loc_array.size(); i++) {
+		if(loc_array[i] > -1 && (loc_array[i] < minsite || loc_array[i] > maxsite)) {
+			loc_array[i] = -1;
+		}
+	}
+
+//	for(unsigned int i = 0; i < loc_array.size(); i++) {
+//		cout << loc_array[i] << " ";
+//	}
+//	cout << endl;
+
 
 	int score = calcAffineScore(loc_array, read);
+	//cout << "score: " << score << endl;
 	return score;
 }
 
@@ -1051,15 +1093,84 @@ void makeGapArray(vector<int> &locArray, int minLoc, int minGap, vector<int> &ga
 	bool doSort=false;
 
 	if(locArray[0] < 0) { locArray[0] = minLoc; }
+//
+//	for(unsigned int i = 0; i < locArray.size(); i++) {
+//		cout << locArray[i] << " ";
+//	}
+//	cout << endl;
+
+//	exit(-1);
+
+/*
+	int lastPos;
+	int start = locArray.size()-1;
+	for(unsigned int i = locArray.size()-1; i > 0; i--) {
+		if(locArray[i] > -1) {
+			lastPos = locArray[i];
+			start = i;
+			break;
+		}
+	}
+	for(unsigned int i = start; i > 0; i--) {
+		if(locArray[i-1] > -1) {
+			if(lastPos < locArray[i-1]) {
+				locArray[i-1] = lastPos;
+			}
+			lastPos = locArray[i-1];
+		}
+	}*/
+/*
+	for(unsigned int i = 0; i < locArray.size(); i++) {
+		cout << locArray[i] << " ";
+	}
+	cout << endl;
+*/
 	for(unsigned int i = 1; i < locArray.size(); i++){
 		if(locArray[i] < 0){ locArray[i] = locArray[i-1] + 1; }
 		else { locArray[i] += i; }
-		if(locArray[i] < locArray[i-1]) { doSort = true; }
+		if(locArray[i] < locArray[i-1]) {
+			doSort = true;
+		}
 	}
 
-	if(doSort){
+	int maxsite = 0;
+	for(unsigned int i = locArray.size()-1; i > 0; i--) {
+		if(locArray[i] > -1) {
+			maxsite = locArray[i];
+			break;
+		}
+	}
+
+
+	int minsite = 0;
+	for(unsigned int i = 0; i < locArray.size(); i++) {
+		if(locArray[i] > -1) {
+			minsite = locArray[i];
+			break;
+		}
+	}
+
+
+//	cout << "maxsite: " << maxsite << endl;
+
+	if(doSort) {
 		sort(locArray.begin(), locArray.begin() + locArray.size());
 	}
+
+/*	if(doSort){
+		//sort(locArray.begin(), locArray.begin() + locArray.size());
+		for(unsigned int i = locArray.size()-1; i > 0; i--) {
+			if(locArray[i] < locArray[i-1]) {
+				locArray[i-1] = locArray[i]-1;
+			}
+		}
+	}
+*/
+/*	for(unsigned int i = 0; i < locArray.size(); i++) {
+		cout << locArray[i] << " ";
+	}
+
+	cout << endl;*/
 
 	for(unsigned int i = 1; i < locArray.size(); i++){
 		int dif = locArray[i] - locArray[i-1];
@@ -1067,23 +1178,65 @@ void makeGapArray(vector<int> &locArray, int minLoc, int minGap, vector<int> &ga
 			gaps++;
 		}
 	}
+/*
+	for(unsigned int i = 0; i < locArray.size(); i++) {
+		cout << locArray[i] << " ";
+	}
+	cout << endl;
+	cout << endl;
+*/
 	if(gaps < 1) {
 		locArray.clear();
 		return;
 	}
 
-	gapArray.push_back(locArray[0]);
+//	for(unsigned int i = 0; i < locArray.size(); i++) {
+//		cout << locArray[i] << " ";
+//	}
+//	cout << endl;
+//	exit(-1);
+
+	gapArray.push_back(minsite);
 
 	for(unsigned int i = 1, j = 1; i < locArray.size(); i++){
+		if(locArray[i-1] < minsite) continue;
 		int dif = locArray[i] - locArray[i-1];
+		//if(locArray[i-1] > maxsite) break;
 		if(dif > minGap) {
+			/*if(locArray[i-1] < minsite && locArray[i] < minsite) {
+				continue;
+			}
+			else if(locArray[i-1] < minsite && locArray[i] > minsite) {
+				int tmpdif =locArray[i] - minsite;
+				if(tmpdif > minGap) {
+
+				}
+			}
+			else if(locArray[i] == minsite) {
+				continue;
+			}*/
+			if(locArray[i-1] > maxsite) {
+				break;
+			}
+			else if(locArray[i] > maxsite && locArray[i-1] < maxsite) {
+				gapArray.push_back(locArray[i-1]);
+				break;
+			}
+			else if(locArray[i-1] == maxsite) {
+				break;
+			}
 			gapArray.push_back(locArray[i-1]);
 			gapArray.push_back(locArray[i]);
 			j+=2;
 		}
 	}
 
-	gapArray.push_back(locArray[locArray.size()-1]);
+	gapArray.push_back(maxsite);
+//	for(unsigned int i = 0; i < gapArray.size(); i++) {
+//		cout << gapArray[i] << " ";
+//	}
+//	cout << endl;
+
 }
 
 
@@ -2004,9 +2157,14 @@ void align(int bestScores[], vector<int> &keys, string &read, vector<int> &offse
 				if(site3-site2 >= MINGAP + (int)read.size()){
 
 					makeGapArray(loc_array, site2, MINGAP, gapArray);
-					if(gapArray.size() != 0){
+					//cout << "score:" << score << endl;
+					/*if(gapArray.size() != 0){
 						gapArray[0] = min(gapArray[0], site2);
 						gapArray[gapArray.size()-1] = max(gapArray[gapArray.size()-1], site3);
+					}*/
+					if(gapArray.size() != 0) {
+						site2 = gapArray[0];
+						site3 = gapArray[gapArray.size()-1];
 					}
 				}
 
@@ -2392,6 +2550,9 @@ void calculateStatistics3(Result &r1, Result &r2, Statistic &statistics) {
 	if(abs(r1.start-r2.start) < 15 && abs(r1.stop-r2.stop) < 15) {
 		statistics.start_and_stop15++;
 	}
+	if(abs(r1.start-r2.start) < 15 || abs(r1.stop-r2.stop) < 15) {
+		statistics.start_or_stop15++;
+	}
 	if(abs(r1.start-r2.start) < 30) {
 		statistics.start30++;
 	}
@@ -2400,6 +2561,9 @@ void calculateStatistics3(Result &r1, Result &r2, Statistic &statistics) {
 	}
 	if(abs(r1.start-r2.start) < 30 && abs(r1.stop-r2.stop) < 30) {
 		statistics.start_and_stop30++;
+	}
+	if(abs(r1.start-r2.start) < 30 || abs(r1.stop-r2.stop) < 30) {
+		statistics.start_or_stop30++;
 	}
 	if(abs(r1.start-r2.start) < 50) {
 		statistics.start50++;
@@ -2410,6 +2574,9 @@ void calculateStatistics3(Result &r1, Result &r2, Statistic &statistics) {
 	if(abs(r1.start-r2.start) < 50 && abs(r1.stop-r2.stop) < 50) {
 		statistics.start_and_stop50++;
 	}
+	if(abs(r1.start-r2.start) < 50 || abs(r1.stop-r2.stop) < 50) {
+		statistics.start_or_stop50++;
+	}
 	if(abs(r1.start-r2.start) < 100) {
 		statistics.start100++;
 	}
@@ -2419,6 +2586,10 @@ void calculateStatistics3(Result &r1, Result &r2, Statistic &statistics) {
 	if(abs(r1.start-r2.start) < 100 && abs(r1.stop-r2.stop) < 100) {
 		statistics.start_and_stop100++;
 	}
+	if(abs(r1.start-r2.start) < 100 || abs(r1.stop-r2.stop) < 100) {
+		statistics.start_or_stop100++;
+	}
+
 }
 
 void calculateStatistics5(Result &r1, Result &r2, Statistic &statistics) {
@@ -2431,7 +2602,9 @@ void calculateStatistics5(Result &r1, Result &r2, Statistic &statistics) {
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 15 && abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 15) {
 		statistics.start_and_stop15++;
 	}
-
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 15 || abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 15) {
+		statistics.start_or_stop15++;
+	}
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 30) {
 		statistics.start30++;
 	}
@@ -2440,6 +2613,9 @@ void calculateStatistics5(Result &r1, Result &r2, Statistic &statistics) {
 	}
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 30 && abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 30) {
 		statistics.start_and_stop30++;
+	}
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 30 || abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 30) {
+		statistics.start_or_stop30++;
 	}
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 50) {
 		statistics.start50++;
@@ -2450,6 +2626,9 @@ void calculateStatistics5(Result &r1, Result &r2, Statistic &statistics) {
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 50 && abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 50) {
 		statistics.start_and_stop50++;
 	}
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 50 || abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 50) {
+		statistics.start_or_stop50++;
+	}
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 100) {
 		statistics.start100++;
 	}
@@ -2458,6 +2637,9 @@ void calculateStatistics5(Result &r1, Result &r2, Statistic &statistics) {
 	}
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 100 && abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 100) {
 		statistics.start_and_stop100++;
+	}
+	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 100 || abs(POSITIONS_INDEX[r1.stop]-r2.stop) < 100) {
+		statistics.start_or_stop100++;
 	}
 }
 
@@ -2484,6 +2666,7 @@ void calculateStatistics4(Result &r1, Result &r2, Statistic &statistics) {
 		if(overlaped) {
 			statistics.overlaping_exons++;
 		}
+		statistics.finded_bases += (POSITIONS_INDEX[r1.gapArray[i+1]] - POSITIONS_INDEX[r1.gapArray[i]]);
 	}
 	statistics.covered_bases += sum;
 }
@@ -2510,11 +2693,13 @@ void calculateStatistics2(Result &r1, Result &r2, Statistic &statistics) {
 				sum += tmp;
 				num_over++;
 				overlaped = true;
+
 			}
 		}
 		if(overlaped) {
 			statistics.overlaping_exons++;
 		}
+		statistics.finded_bases += (r1.gapArray[i+1] - r1.gapArray[i]);
 		//if(num_over > 1) cout << "num over: " << num_over << endl;
 	}
 	statistics.covered_bases += sum;
@@ -2523,6 +2708,7 @@ void calculateStatistics2(Result &r1, Result &r2, Statistic &statistics) {
 
 void writeTotalStatistics(string infile, Statistic &statistic) {
 	ofstream out_stat(infile.c_str());
+
 	out_stat << "Total number of reads: " << statistic.total_reads << endl;
 	out_stat << "Number of aligned reads: " << statistic.aligned_reads << " - ";
 	out_stat << (100 * statistic.aligned_reads / (double) statistic.total_reads) << "%" << endl;
@@ -2536,43 +2722,69 @@ void writeTotalStatistics(string infile, Statistic &statistic) {
 	out_stat << (100 * (statistic.overlaping_exons / (double) statistic.found_exons)) << "%" << endl;
 
 	out_stat << "Reads with correct starts (<15): " << statistic.start15 << " - ";
-	out_stat << (100 * statistic.start15 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.start15 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start15 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct stops (<15): " << statistic.stop15 << " - ";
-	out_stat << (100 * statistic.stop15 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.stop15 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.stop15 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct starts and stops (<15): " << statistic.start_and_stop15 << " - ";
-	out_stat << (100 * statistic.start_and_stop15 / (double) statistic.aligned_reads) << "%" << endl;
-
+	out_stat << (100 * statistic.start_and_stop15 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start_and_stop15 / (double) statistic.total_reads) << "%" << endl;
+	out_stat << "Reads with correct starts or stops (<15): " << statistic.start_or_stop15 << " - ";
+	out_stat << (100 * statistic.start_or_stop15 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start_or_stop15 / (double) statistic.total_reads) << "%" << endl;
 
 	out_stat << "Reads with correct starts (<30): " << statistic.start30 << " - ";
-	out_stat << (100 * statistic.start30 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.start30 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start30 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct stops (<30): " << statistic.stop30 << " - ";
-	out_stat << (100 * statistic.stop30 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.stop30 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.stop30 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct starts and stops (<30): " << statistic.start_and_stop30 << " - ";
-	out_stat << (100 * statistic.start_and_stop30 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.start_and_stop30 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start_and_stop30 / (double) statistic.total_reads) << "%" << endl;
+	out_stat << "Reads with correct starts or stops (<30): " << statistic.start_or_stop30 << " - ";
+	out_stat << (100 * statistic.start_or_stop30 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start_or_stop30 / (double) statistic.total_reads) << "%" << endl;
 
 	out_stat << "Reads with correct starts (<50): " << statistic.start50 << " - ";
-	out_stat << (100 * statistic.start50 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.start50 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start50 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct stops (<50): " << statistic.stop50 << " - ";
-	out_stat << (100 * statistic.stop50 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.stop50 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.stop50 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct starts and stops (<50): " << statistic.start_and_stop50 << " - ";
-	out_stat << (100 * statistic.start_and_stop50 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.start_and_stop50 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start_and_stop50 / (double) statistic.total_reads) << "%" << endl;
+	out_stat << "Reads with correct starts or stops (<50): " << statistic.start_or_stop50 << " - ";
+	out_stat << (100 * statistic.start_or_stop50 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start_or_stop50 / (double) statistic.total_reads) << "%" << endl;
 
 	out_stat << "Reads with correct starts (<100): " << statistic.start100 << " - ";
-	out_stat << (100 * statistic.start100 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.start100 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start100 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct stops (<100): " << statistic.stop100 << " - ";
-	out_stat << (100 * statistic.stop100 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.stop100 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.stop100 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct starts and stops (<100): " << statistic.start_and_stop100 << " - ";
-	out_stat << (100 * statistic.start_and_stop100 / (double) statistic.aligned_reads) << "%" << endl;
+	out_stat << (100 * statistic.start_and_stop100 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start_and_stop100 / (double) statistic.total_reads) << "%" << endl;
+	out_stat << "Reads with correct starts or stops (<100): " << statistic.start_or_stop100 << " - ";
+	out_stat << (100 * statistic.start_or_stop100 / (double) statistic.aligned_reads) << "% - ";
+	out_stat << (100 * statistic.start_or_stop100 / (double) statistic.total_reads) << "%" << endl;
 
 	out_stat << "Total number of bases: " << statistic.total_bases << endl;
 	out_stat << "Number of covered bases: " << statistic.covered_bases << endl;
+	out_stat << "Number of founded bases: " << statistic.finded_bases << endl;
 	out_stat << "Percentage of covered bases of all reads: ";
 	out_stat << (100 * (statistic.covered_bases / (double) statistic.total_bases)) << "%" << endl;
 	out_stat << "Percentage of covered bases of aligned reads: ";
 	out_stat << (100 * (statistic.covered_bases / (double) statistic.aligned_bases)) << "%" << endl;
 
-	out_stat.close();
+	out_stat << "Percentage of covered bases of founded reads: ";
+	out_stat << (100 * (statistic.covered_bases / (double) statistic.finded_bases)) << "%" << endl;
 
+	out_stat.close();
 }
 
 void addTotalStatistics(vector<Result> &results, map<int, Result> &correct_results, Statistic &statistic) {
@@ -2592,14 +2804,19 @@ void addTotalStatistics(vector<Result> &results, map<int, Result> &correct_resul
 			calculateStatistics3(r1, r2, statistic);
 		}
 	}
+	if(IS_SECOND_PHASE) {
+		statistic.aligned_reads = statistic.aligned_reads / (double) SECOND_PHASE_SPLIT_COUNT;
+	}
+	else {
+		statistic.aligned_reads = statistic.aligned_reads / (double) SPLIT_COUNT;
+	}
 
 	statistic.unaligned_reads = statistic.total_reads - statistic.aligned_reads;
-
 
 }
 
 void writeStatistics(vector<Result> &results, map<int, Result> &correct_results, string infile, Statistic &statistic) {
-	ofstream out_stat(infile.c_str());
+	//ofstream out_stat(infile.c_str());
 
 	statistic.total_bases = TOTAL_BASE_NUM;
 	statistic.aligned_bases = ALIGNED_BASE_NUM;
@@ -2617,58 +2834,13 @@ void writeStatistics(vector<Result> &results, map<int, Result> &correct_results,
 			calculateStatistics3(r1, r2, statistic);
 		}
 	}
-
-	statistic.unaligned_reads = statistic.total_reads - statistic.aligned_reads;
-
-	out_stat << "Total number of reads: " << statistic.total_reads << endl;
-	out_stat << "Number of aligned reads: " << statistic.aligned_reads << " - ";
-	out_stat << (100 * statistic.aligned_reads / (double) statistic.total_reads) << "%" << endl;
-	out_stat << "Unaligned number of reads: " << statistic.unaligned_reads << " - ";
-	out_stat << (100 * statistic.unaligned_reads / (double) statistic.total_reads) << "%" << endl;
-
-	out_stat <<	"Total number of exons: " << statistic.total_exons << endl;
-	out_stat << "Number of found exons: " << statistic.found_exons << " - ";
-	out_stat << (100 * (statistic.found_exons / (double) statistic.total_exons)) << "%" << endl;
-	out_stat << "Number of overlaping exons: " << statistic.overlaping_exons << " - ";
-	out_stat << (100 * (statistic.overlaping_exons / (double) statistic.found_exons)) << "%" << endl;
-
-	out_stat << "Reads with correct starts (<15): " << statistic.start15 << " - ";
-	out_stat << (100 * statistic.start15 / (double) statistic.aligned_reads) << "%" << endl;
-	out_stat << "Reads with correct stops (<15): " << statistic.stop15 << " - ";
-	out_stat << (100 * statistic.stop15 / (double) statistic.aligned_reads) << "%" << endl;
-	out_stat << "Reads with correct starts and stops (<15): " << statistic.start_and_stop15 << " - ";
-	out_stat << (100 * statistic.start_and_stop15 / (double) statistic.aligned_reads) << "%" << endl;
-
-
-	out_stat << "Reads with correct starts (<30): " << statistic.start30 << " - ";
-	out_stat << (100 * statistic.start30 / (double) statistic.aligned_reads) << "%" << endl;
-	out_stat << "Reads with correct stops (<30): " << statistic.stop30 << " - ";
-	out_stat << (100 * statistic.stop30 / (double) statistic.aligned_reads) << "%" << endl;
-	out_stat << "Reads with correct starts and stops (<30): " << statistic.start_and_stop30 << " - ";
-	out_stat << (100 * statistic.start_and_stop30 / (double) statistic.aligned_reads) << "%" << endl;
-
-	out_stat << "Reads with correct starts (<50): " << statistic.start50 << " - ";
-	out_stat << (100 * statistic.start50 / (double) statistic.aligned_reads) << "%" << endl;
-	out_stat << "Reads with correct stops (<50): " << statistic.stop50 << " - ";
-	out_stat << (100 * statistic.stop50 / (double) statistic.aligned_reads) << "%" << endl;
-	out_stat << "Reads with correct starts and stops (<50): " << statistic.start_and_stop50 << " - ";
-	out_stat << (100 * statistic.start_and_stop50 / (double) statistic.aligned_reads) << "%" << endl;
-
-	out_stat << "Reads with correct starts (<100): " << statistic.start100 << " - ";
-	out_stat << (100 * statistic.start100 / (double) statistic.aligned_reads) << "%" << endl;
-	out_stat << "Reads with correct stops (<100): " << statistic.stop100 << " - ";
-	out_stat << (100 * statistic.stop100 / (double) statistic.aligned_reads) << "%" << endl;
-	out_stat << "Reads with correct starts and stops (<100): " << statistic.start_and_stop100 << " - ";
-	out_stat << (100 * statistic.start_and_stop100 / (double) statistic.aligned_reads) << "%" << endl;
-
-	out_stat << "Total number of bases: " << statistic.total_bases << endl;
-	out_stat << "Number of covered bases: " << statistic.covered_bases << endl;
-	out_stat << "Percentage of covered bases of all reads: ";
-	out_stat << (100 * (statistic.covered_bases / (double) statistic.total_bases)) << "%" << endl;
-	out_stat << "Percentage of covered bases of aligned reads: ";
-	out_stat << (100 * (statistic.covered_bases / (double) statistic.aligned_bases)) << "%" << endl;
-
-	out_stat.close();
+	if(IS_SECOND_PHASE) {
+		statistic.aligned_reads = statistic.aligned_reads / (double) SECOND_PHASE_SPLIT_COUNT;
+	}
+	else {
+		statistic.aligned_reads = statistic.aligned_reads / (double) SPLIT_COUNT;
+	}
+	writeTotalStatistics(infile, statistic);
 
 }
 
@@ -2725,6 +2897,7 @@ void checkParameter(string command, string value) {
 	}
 	else if(strcmp(command.c_str(), "-k") == 0) {
 		KEYLEN = atoi(value.c_str());
+		KEYSPACE = pow(2, 2*KEYLEN);
 		cout << "KEYLEN set to " << value << "." << endl;
 		info.first_phase_keylen = KEYLEN;
 	}
@@ -2740,7 +2913,7 @@ void checkParameter(string command, string value) {
 	}
 	else if(strcmp(command.c_str(), "-sp") == 0) {
 		SECOND_PHASE_PRECISE = false;
-		cout << "Secon phase set to low precision." << endl;
+		cout << "Second phase set to low precision." << endl;
 		info.second_phase_precision = SECOND_PHASE_PRECISE;
 	}
 	else if(strcmp(command.c_str(), "-mi") == 0) {
@@ -2989,7 +3162,7 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	Statistic s = Statistic(reads.size() * SPLIT_COUNT);
+	Statistic s = Statistic(reads.size());
 	writeStatistics(tmp_results, correct_results, OUTDIR + "//" + "statistics" + addon + build + ".txt", s);
 	if(!SECOND_PHASE_MODE && !IS_SECOND_PHASE) {
 		addTotalStatistics(tmp_results, correct_results, global_stat);
@@ -3027,7 +3200,7 @@ void updatePrecision(bool prec) {
 		MIN_QSCORE_MULT = 0.025;
 		MIN_SCORE_MULT = 0.15;
 		DYNAMIC_SCORE_THRESH = 0.84;
-		MAX_DESIRED_KEYS = 63;
+		MAX_DESIRED_KEYS = 15;
 		MIN_KEYS_DESIRED = 2;
 		MIN_KEY_DENSITY = 1.5;
 		KEY_DENSITY = 1.9;
@@ -3107,6 +3280,20 @@ void writeInfo() {
 	out_info << "New reference size: " << info.new_ref_size << endl;
 }
 
+void evaluateCoverage(vector<int> &final_coverage, vector<int> &correct_coverage, string infile) {
+	ofstream streamout(infile.c_str());
+	//cout << "final coverage: " << final_coverage.size() << endl;
+	//cout << "correct coverage: " << correct_coverage.size() << endl;
+	int sum = 0;
+//	cout << "starting" << endl;
+	for(unsigned int i = 0; i < final_coverage.size(); i++) {
+		sum += abs(final_coverage[i] - correct_coverage[i]);
+		//cout << i;
+	}
+	cout << "Coverage difference: " << sum << endl;
+	streamout << "Coverage difference: " << sum << endl;
+}
+
 int main(int argc, char *argv[]) {
 
 	timeval t3, t4;
@@ -3143,7 +3330,7 @@ int main(int argc, char *argv[]) {
 	readReads(reads, read_names, correct_results, argv[2]);
 	vector<Result> results;
 
-	global_stat.total_reads = reads.size();
+	global_stat.total_reads = reads.size() * SPLIT_COUNT;
 	global_stat.total_bases = TOTAL_BASE_NUM;
 
 	info.read_number = reads.size();
@@ -3163,6 +3350,7 @@ int main(int argc, char *argv[]) {
 	for(unsigned int i = 0; i < genome_size; i++) {
 		coverage.push_back(0);
 	}
+
 	//calculateCoverageFromResults(coverage, outdir + "//" + "results" + build + ".txt");
 	calculateCoverageFromVector(coverage, results);
 	//writeCoverageFiltered(outdir + "//" + "coverage" + build + ".cut", coverage);
@@ -3233,6 +3421,8 @@ int main(int argc, char *argv[]) {
 
 	results.clear();
 
+	cout << "main parameter: " << MIN_QSCORE_MULT2 << endl;
+
 	if(SECOND_PHASE_MODE) {
 		secondAlign(res, read_names, correct_results, part_genome, reads, false,
 			final_unaligned_reads, new_aligned_reads, results);
@@ -3248,6 +3438,28 @@ int main(int argc, char *argv[]) {
 	long endday3 = t4.tv_sec;
 	long endday4 = t4.tv_usec;
 	double timefinal2 = ((endday3 - startday3) * 1000000.0 + (endday4 - startday4))/ 1000000;
+
+	vector<int> final_coverage;
+	if(SECOND_PHASE_MODE) {
+		for(unsigned int i = 0; i < genome_size; i++) {
+			final_coverage.push_back(0);
+		}
+		calculateCoverageFromVector(final_coverage, results);
+	}
+	else {
+		for(unsigned int i = 0; i < genome_size; i++) {
+			final_coverage.push_back(coverage[i]);
+		}
+		calculateCoverageFromVector(final_coverage, results);
+	}
+
+	vector<int> correct_coverage;
+	for(unsigned int i = 0; i < genome_size; i++) {
+		correct_coverage.push_back(0);
+	}
+	calculateCoverageFromCig(correct_coverage, argv[2]);
+
+	evaluateCoverage(final_coverage, correct_coverage, OUTDIR + "//" + "cov" + build + ".txt");
 
 	writeInfo();
 	info.total_execution_time = timefinal2;
