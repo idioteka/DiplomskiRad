@@ -4,6 +4,32 @@
 #include "const.h";
 
 
+int parseLine(char* line){
+	int i = strlen(line);
+	while (*line < '0' || *line > '9') line++;
+	line[i-3] = '\0';
+	i = atoi(line);
+	return i;
+}
+
+
+int getValue(){ //Note: this value is in KB!
+	FILE* file = fopen("/proc/self/status", "r");
+	int result = -1;
+	char line[128];
+
+
+	while (fgets(line, 128, file) != NULL){
+		if (strncmp(line, "VmSize:", 7) == 0){
+			result = parseLine(line);
+			break;
+		}
+	}
+	fclose(file);
+	return result;
+}
+
+
 struct Statistic2 {
 	int covered;
 	int reads;
@@ -77,14 +103,18 @@ struct Result {
 	int br;
 	int start;
 	int stop;
+	int score;
+	int maxScore;
 	string matchString;
 	vector<int> gapArray;
 	//int precise_start;
 	//int precise_stop;
-	Result(int br_, int start_, int stop_) {
+	Result(int br_, int start_, int stop_, int score_, int maxScore_) {
 		br = br_;
 		start = start_;
 		stop = stop_;
+		score = score_;
+		maxScore = maxScore_;
 	}
 };
 
@@ -283,7 +313,7 @@ void readReads(vector<Read> &reads, map<int, FastaRead> &fastaReads, map<int, Re
 		FastaRead fr(first, second);
 		std::map<int,FastaRead>::iterator it2 = fastaReads.begin();
 		fastaReads.insert(it2, pair<int,FastaRead>(br, fr));
-		Result r = Result(br, atoi(line2.c_str()), atoi(line3.c_str()));
+		Result r = Result(br, atoi(line2.c_str()), atoi(line3.c_str()), 0, 0);
 		r.matchString = line4;
 		gapArrayFromString(r.gapArray, line5);
 		std::map<int,Result>::iterator it = results.begin();
@@ -507,6 +537,8 @@ void makeOffsets(string read, vector<int> &offsets) {
 		f += interval;
 		j = min(((int) read.size() - KEYLEN), (max(j+1, (int) round(f))));
 	}
+
+	//cout << "offfff: " << offsets.size() << endl;
 }
 
 /*
@@ -1974,7 +2006,7 @@ void makeMatchStringForSite(SiteScore ss, string &read, int *sizes, int *sites, 
 	fillLimited(read, whole_genome, ss.start, ss.stop, score, ss.gapArray, max, r);
 }
 
-void makeMatchString(vector<SiteScore> &results, string &read, string &read_reverse, int *sizes, int *sites, vector<Result> &resultsFinal, string &whole_genome, int threadId, int br) {
+void makeMatchString(vector<SiteScore> &results, string &read, string &read_reverse, int *sizes, int *sites, vector<Result> &resultsFinal, string &whole_genome, int threadId, int br, int maxScore) {
 	int max_score = -9999;
 	SiteScore ss;
 
@@ -1985,7 +2017,7 @@ void makeMatchString(vector<SiteScore> &results, string &read, string &read_reve
 			ss = results[i];
 		}
 	}
-	Result r = Result(br, ss.start, ss.stop);
+	Result r = Result(br, ss.start, ss.stop, ss.score, maxScore);
 	r.gapArray = ss.gapArray;
 
 /*
@@ -2357,7 +2389,7 @@ void processRead(int *sizes, int *sites, string &r1, vector<Result> &resultsFina
 		}
 
 		if(results.size() != 0) {
-			makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br);
+			makeMatchString(results, read, read_reverse, sizes, sites, resultsFinal, whole_genome, threadId, br, max_score);
 			ALIGNED_BASE_NUM += read.size();
 			Read rea(br, read);
 			aligned_reads.push_back(rea);
@@ -2539,7 +2571,31 @@ int calculateOverlap(int start1, int stop1, int start2, int stop2) {
 	else return 0;
 }
 
-void calculateStatistics3(Result &r1, Result &r2, Statistic &statistics) {
+void calculateStatistics3(Result &r1, Result &r2, Statistic &statistics, map<int, int> &sss, map<int, int> &sts) {
+
+	int startOf = r1.start-r2.start;
+	int stopOf = r1.stop-r2.stop;
+
+	if ( sss.find(startOf) == sss.end() ) {
+		sss.insert ( std::pair<int,int>(startOf,1) );
+	} else {
+		std::map<int,int>::iterator it;
+		it=sss.find(startOf);
+		it->second = it->second+1;
+//		int tmp = it->second;
+//		sss.insert(pair<int, int>(startOf, tmp+1));
+	}
+
+	if ( sts.find(stopOf) == sts.end() ) {
+		sts.insert ( std::pair<int,int>(stopOf,1) );
+	} else {
+		std::map<int,int>::iterator it;
+		it=sts.find(stopOf);
+		it->second = it->second+1;
+//		int tmp = it->second;
+//		sts.insert(pair<int, int>(stopOf, tmp+1));
+	}
+
 
 	if(abs(r1.start-r2.start) < 15) {
 		statistics.start15++;
@@ -2592,7 +2648,29 @@ void calculateStatistics3(Result &r1, Result &r2, Statistic &statistics) {
 
 }
 
-void calculateStatistics5(Result &r1, Result &r2, Statistic &statistics) {
+void calculateStatistics5(Result &r1, Result &r2, Statistic &statistics, map<int, int> &sss, map<int, int> &sts) {
+
+	int startOf = POSITIONS_INDEX[r1.start]-r2.start;
+	int stopOf = POSITIONS_INDEX[r1.stop]-r2.stop;
+
+	if ( sss.find(startOf) == sss.end() ) {
+		sss.insert ( std::pair<int,int>(startOf,1) );
+	} else {
+		std::map<int,int>::iterator it;
+		it=sss.find(startOf);
+		int tmp = it->second;
+		sss.insert(pair<int, int>(startOf, tmp+1));
+	}
+
+	if ( sts.find(stopOf) == sts.end() ) {
+		sts.insert ( std::pair<int,int>(stopOf,1) );
+	} else {
+		std::map<int,int>::iterator it;
+		it=sts.find(stopOf);
+		int tmp = it->second;
+		sts.insert(pair<int, int>(stopOf, tmp+1));
+	}
+
 	if(abs(POSITIONS_INDEX[r1.start]-r2.start) < 15) {
 		statistics.start15++;
 	}
@@ -2706,7 +2784,7 @@ void calculateStatistics2(Result &r1, Result &r2, Statistic &statistics) {
 
 }
 
-void writeTotalStatistics(string infile, Statistic &statistic) {
+void writeTotalStatistics(string infile, string sssfile, Statistic &statistic, map<int, int> sss, map<int, int> sts) {
 	ofstream out_stat(infile.c_str());
 
 	out_stat << "Total number of reads: " << statistic.total_reads << endl;
@@ -2731,9 +2809,14 @@ void writeTotalStatistics(string infile, Statistic &statistic) {
 	out_stat << (100 * statistic.start_and_stop15 / (double) statistic.aligned_reads) << "% - ";
 	out_stat << (100 * statistic.start_and_stop15 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct starts or stops (<15): " << statistic.start_or_stop15 << " - ";
-	out_stat << (100 * statistic.start_or_stop15 / (double) statistic.aligned_reads) << "% - ";
-	out_stat << (100 * statistic.start_or_stop15 / (double) statistic.total_reads) << "%" << endl;
-
+	if(SPLIT_COUNT != 1) {
+		out_stat << (100 * statistic.start_or_stop15 / (double) (statistic.aligned_reads * (SPLIT_COUNT/2))) << "% - ";
+		out_stat << (100 * statistic.start_or_stop15 / (double) (statistic.total_reads * (SPLIT_COUNT/2))) << "%" << endl;
+	}
+	else {
+		out_stat << (100 * statistic.start_or_stop15 / (double) (statistic.aligned_reads)) << "% - ";
+		out_stat << (100 * statistic.start_or_stop15 / (double) (statistic.total_reads)) << "%" << endl;
+	}
 	out_stat << "Reads with correct starts (<30): " << statistic.start30 << " - ";
 	out_stat << (100 * statistic.start30 / (double) statistic.aligned_reads) << "% - ";
 	out_stat << (100 * statistic.start30 / (double) statistic.total_reads) << "%" << endl;
@@ -2744,9 +2827,14 @@ void writeTotalStatistics(string infile, Statistic &statistic) {
 	out_stat << (100 * statistic.start_and_stop30 / (double) statistic.aligned_reads) << "% - ";
 	out_stat << (100 * statistic.start_and_stop30 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct starts or stops (<30): " << statistic.start_or_stop30 << " - ";
-	out_stat << (100 * statistic.start_or_stop30 / (double) statistic.aligned_reads) << "% - ";
-	out_stat << (100 * statistic.start_or_stop30 / (double) statistic.total_reads) << "%" << endl;
-
+	if(SPLIT_COUNT != 1) {
+		out_stat << (100 * statistic.start_or_stop30 / (double) (statistic.aligned_reads * (SPLIT_COUNT/2))) << "% - ";
+		out_stat << (100 * statistic.start_or_stop30 / (double) (statistic.total_reads * (SPLIT_COUNT/2))) << "%" << endl;
+	}
+	else {
+		out_stat << (100 * statistic.start_or_stop30 / (double) (statistic.aligned_reads)) << "% - ";
+		out_stat << (100 * statistic.start_or_stop30 / (double) (statistic.total_reads)) << "%" << endl;
+	}
 	out_stat << "Reads with correct starts (<50): " << statistic.start50 << " - ";
 	out_stat << (100 * statistic.start50 / (double) statistic.aligned_reads) << "% - ";
 	out_stat << (100 * statistic.start50 / (double) statistic.total_reads) << "%" << endl;
@@ -2757,9 +2845,14 @@ void writeTotalStatistics(string infile, Statistic &statistic) {
 	out_stat << (100 * statistic.start_and_stop50 / (double) statistic.aligned_reads) << "% - ";
 	out_stat << (100 * statistic.start_and_stop50 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct starts or stops (<50): " << statistic.start_or_stop50 << " - ";
-	out_stat << (100 * statistic.start_or_stop50 / (double) statistic.aligned_reads) << "% - ";
-	out_stat << (100 * statistic.start_or_stop50 / (double) statistic.total_reads) << "%" << endl;
-
+	if(SPLIT_COUNT != 1) {
+		out_stat << (100 * statistic.start_or_stop50 / (double) (statistic.aligned_reads * (SPLIT_COUNT/2))) << "% - ";
+		out_stat << (100 * statistic.start_or_stop50 / (double) (statistic.total_reads * (SPLIT_COUNT/2))) << "%" << endl;
+	}
+	else {
+		out_stat << (100 * statistic.start_or_stop50 / (double) (statistic.aligned_reads)) << "% - ";
+		out_stat << (100 * statistic.start_or_stop50 / (double) (statistic.total_reads)) << "%" << endl;
+	}
 	out_stat << "Reads with correct starts (<100): " << statistic.start100 << " - ";
 	out_stat << (100 * statistic.start100 / (double) statistic.aligned_reads) << "% - ";
 	out_stat << (100 * statistic.start100 / (double) statistic.total_reads) << "%" << endl;
@@ -2770,9 +2863,14 @@ void writeTotalStatistics(string infile, Statistic &statistic) {
 	out_stat << (100 * statistic.start_and_stop100 / (double) statistic.aligned_reads) << "% - ";
 	out_stat << (100 * statistic.start_and_stop100 / (double) statistic.total_reads) << "%" << endl;
 	out_stat << "Reads with correct starts or stops (<100): " << statistic.start_or_stop100 << " - ";
-	out_stat << (100 * statistic.start_or_stop100 / (double) statistic.aligned_reads) << "% - ";
-	out_stat << (100 * statistic.start_or_stop100 / (double) statistic.total_reads) << "%" << endl;
-
+	if(SPLIT_COUNT != 1) {
+		out_stat << (100 * statistic.start_or_stop100 / (double) (statistic.aligned_reads * (SPLIT_COUNT/2))) << "% - ";
+		out_stat << (100 * statistic.start_or_stop100 / (double) (statistic.total_reads * (SPLIT_COUNT/2))) << "%" << endl;
+	}
+	else {
+		out_stat << (100 * statistic.start_or_stop100 / (double) (statistic.aligned_reads)) << "% - ";
+		out_stat << (100 * statistic.start_or_stop100 / (double) (statistic.total_reads)) << "%" << endl;
+	}
 	out_stat << "Total number of bases: " << statistic.total_bases << endl;
 	out_stat << "Number of covered bases: " << statistic.covered_bases << endl;
 	out_stat << "Number of founded bases: " << statistic.finded_bases << endl;
@@ -2785,6 +2883,18 @@ void writeTotalStatistics(string infile, Statistic &statistic) {
 	out_stat << (100 * (statistic.covered_bases / (double) statistic.finded_bases)) << "%" << endl;
 
 	out_stat.close();
+
+	ofstream out_sss(sssfile.c_str());
+
+	typedef std::map<int, int>::iterator it_type;
+	for(it_type iterator = sss.begin(); iterator != sss.end(); iterator++) {
+		out_sss << iterator->first << " " << iterator->second << endl;
+	}
+	out_sss << "#" << endl;
+	for(it_type iterator = sts.begin(); iterator != sts.end(); iterator++) {
+		out_sss << iterator->first << " " << iterator->second << endl;
+	}
+
 }
 
 void addTotalStatistics(vector<Result> &results, map<int, Result> &correct_results, Statistic &statistic) {
@@ -2798,28 +2908,34 @@ void addTotalStatistics(vector<Result> &results, map<int, Result> &correct_resul
 
 		if(IS_SECOND_PHASE) {
 			calculateStatistics4(r1, r2, statistic);
-			calculateStatistics5(r1, r2, statistic);
+			//cout << "4" << endl;
+			calculateStatistics5(r1, r2, statistic, ssstat, ststat);
+		//	cout << "5" << endl;
 		} else {
 			calculateStatistics2(r1, r2, statistic);
-			calculateStatistics3(r1, r2, statistic);
+			calculateStatistics3(r1, r2, statistic, ssstat, ststat);
 		}
 	}
 	if(IS_SECOND_PHASE) {
-		statistic.aligned_reads = statistic.aligned_reads / (double) SECOND_PHASE_SPLIT_COUNT;
+		statistic.aligned_reads = statistic.aligned_reads / (double) SPLIT_COUNT;
 	}
 	else {
 		statistic.aligned_reads = statistic.aligned_reads / (double) SPLIT_COUNT;
 	}
 
 	statistic.unaligned_reads = statistic.total_reads - statistic.aligned_reads;
+	//cout << "sss: " << statistic.unaligned_reads << endl;
 
 }
 
-void writeStatistics(vector<Result> &results, map<int, Result> &correct_results, string infile, Statistic &statistic) {
+void writeStatistics(vector<Result> &results, map<int, Result> &correct_results, string infile, string sssfile, Statistic &statistic) {
 	//ofstream out_stat(infile.c_str());
 
 	statistic.total_bases = TOTAL_BASE_NUM;
 	statistic.aligned_bases = ALIGNED_BASE_NUM;
+
+	map<int, int> sss;
+	map<int, int> sts;
 
 	for(unsigned int i = 0; i < results.size(); i++) {
 		Result r1 = results[i];
@@ -2828,19 +2944,21 @@ void writeStatistics(vector<Result> &results, map<int, Result> &correct_results,
 
 		if(IS_SECOND_PHASE) {
 			calculateStatistics4(r1, r2, statistic);
-			calculateStatistics5(r1, r2, statistic);
+			calculateStatistics5(r1, r2, statistic, sss, sts);
 		} else {
 			calculateStatistics2(r1, r2, statistic);
-			calculateStatistics3(r1, r2, statistic);
+			calculateStatistics3(r1, r2, statistic, sss, sts);
 		}
 	}
 	if(IS_SECOND_PHASE) {
-		statistic.aligned_reads = statistic.aligned_reads / (double) SECOND_PHASE_SPLIT_COUNT;
+		statistic.aligned_reads = statistic.aligned_reads / (double) SPLIT_COUNT;
 	}
 	else {
 		statistic.aligned_reads = statistic.aligned_reads / (double) SPLIT_COUNT;
 	}
-	writeTotalStatistics(infile, statistic);
+	statistic.unaligned_reads = statistic.total_reads - statistic.aligned_reads;
+
+	writeTotalStatistics(infile, sssfile, statistic, sss, sts);
 
 }
 
@@ -2906,15 +3024,29 @@ void checkParameter(string command, string value) {
 		cout << "KEYLEN2 set to " << value << "." << endl;
 		info.second_phase_keylen = KEYLEN2;
 	}
+	else if(strcmp(command.c_str(), "-k3") == 0) {
+		KEYLEN3 = atoi(value.c_str());
+		cout << "KEYLEN3 set to " << value << "." << endl;
+		info.third_phase_keylen = KEYLEN3;
+	}
 	else if(strcmp(command.c_str(), "-p") == 0) {
 		PRECISE = false;
+		MULTY_PRECISION = atoi(value.c_str());
 		cout << "Set to low precision." << endl;
 		info.first_phase_precision = PRECISE;
+		info.first_phase_multy_precision = MULTY_PRECISION;
 	}
 	else if(strcmp(command.c_str(), "-sp") == 0) {
 		SECOND_PHASE_PRECISE = false;
+		SECOND_PHASE_MULTY_PRECISION = atoi(value.c_str());
 		cout << "Second phase set to low precision." << endl;
 		info.second_phase_precision = SECOND_PHASE_PRECISE;
+		info.second_phase_multy_precision = SECOND_PHASE_MULTY_PRECISION;
+	}
+	else if(strcmp(command.c_str(), "-tp") == 0) {
+		THIRD_PHASE_MULTY_PRECISION = atoi(value.c_str());
+		cout << "Third phase set to low precision." << endl;
+		info.third_phase_multy_precision = THIRD_PHASE_MULTY_PRECISION;
 	}
 	else if(strcmp(command.c_str(), "-mi") == 0) {
 		MAX_INDEL2 = atoi(value.c_str());
@@ -2925,6 +3057,11 @@ void checkParameter(string command, string value) {
 		SECOND_PHASE_MAX_INDEL2 = atoi(value.c_str());
 		cout << "Second phase max indel set to " << value << "." << endl;
 		info.second_phase_max_indel = SECOND_PHASE_MAX_INDEL2;
+	}
+	else if(strcmp(command.c_str(), "-tmi") == 0) {
+		THIRD_PHASE_MAX_INDEL2 = atoi(value.c_str());
+		cout << "Third phase max indel set to " << value << "." << endl;
+		info.third_phase_max_indel = THIRD_PHASE_MAX_INDEL2;
 	}
 	else if(strcmp(command.c_str(), "-ct") == 0) {
 		COV_THRES = atoi(value.c_str());
@@ -2945,6 +3082,10 @@ void checkParameter(string command, string value) {
 		SECOND_PHASE_MODE = atoi(value.c_str());
 		cout << "Second phase mode set to " << value << "." << endl;
 		info.second_phase_mode = SECOND_PHASE_MODE;
+	}
+	else if(strcmp(command.c_str(), "-pc") == 0) {
+		PRECISION_CUTOFF = atof(value.c_str());
+		cout << "Precision cutoff set to " << value << "." << endl;
 	}
 	else {
 		cout << "Parameter " << command << " not recognized." << endl;
@@ -3119,6 +3260,15 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 
 	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "Reads aligned: " << timefinal << " seconds." << endl;
+	if(!IS_SECOND_PHASE) {
+		info.first_align_time2 = timefinal;
+	}
+	else if(!IS_THIRD_PHASE) {
+		info.second_align_time2 = timefinal;
+	}
+	else {
+		info.second_align_time2 = timefinal;
+	}
 
 	for(unsigned int i = 0; i < set_of_results.size(); i++) {
 		for(unsigned int j = 0; j < set_of_results[i].size(); j++) {
@@ -3151,8 +3301,14 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
-	writeResults(tmp_results, correct_results, OUTDIR + "//" + "results" + addon + build + ".txt");
-	writeSamResults(tmp_results, reads, read_names, OUTDIR + "//" + "results" + addon + build + ".sam");
+	if(!IS_SECOND_PHASE) {
+		writeResults(tmp_results, correct_results, OUTDIR + "//" + "results" + addon + build + ".txt");
+		writeSamResults(tmp_results, reads, read_names, OUTDIR + "//" + "results" + addon + build + ".sam");
+	}
+	else if(!SECOND_PHASE_MODE) {
+		writeResults(tmp_results, correct_results, OUTDIR + "//" + "results" + addon + build + ".txt");
+		writeSamResults(tmp_results, reads, read_names, OUTDIR + "//" + "results" + addon + build + ".sam");
+	}
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
@@ -3163,19 +3319,35 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
 	Statistic s = Statistic(reads.size());
-	writeStatistics(tmp_results, correct_results, OUTDIR + "//" + "statistics" + addon + build + ".txt", s);
-	if(!SECOND_PHASE_MODE && !IS_SECOND_PHASE) {
-		addTotalStatistics(tmp_results, correct_results, global_stat);
+	if(!IS_SECOND_PHASE) {
+		writeStatistics(tmp_results, correct_results, OUTDIR + "//" + "statistics" + addon + build + ".txt", OUTDIR + "//" + "sss" + addon + build + ".txt", s);
+		if(!SECOND_PHASE_MODE) {
+			addTotalStatistics(tmp_results, correct_results, global_stat);
+		}
 	}
-	if(IS_SECOND_PHASE) {
+	else if(!IS_THIRD_PHASE) {
 		addTotalStatistics(tmp_results, correct_results, global_stat);
-		writeTotalStatistics(OUTDIR + "//" + "statistics" + "t" + build + ".txt", global_stat);
+		writeStatistics(tmp_results, correct_results, OUTDIR + "//" + "statistics" + addon + build + ".txt", OUTDIR + "//" + "sss" + addon + build + ".txt", s);
+		if(!SECOND_PHASE_MODE) {
+			writeTotalStatistics(OUTDIR + "//" + "statistics" + "t" + build + ".txt", OUTDIR + "//" + "sss" + addon + build + ".txt", global_stat, ssstat, ststat);
+		}
 	}
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "Statistics written: " << timefinal << " seconds. " << endl;
+
+	int memory = getValue();
+	if(!IS_SECOND_PHASE) {
+		info.memory_after_first_align = memory;
+	}
+	else if(!IS_THIRD_PHASE) {
+		info.memory_after_second_align = memory;
+	}
+	else {
+		info.memory_after_third_align = memory;
+	}
 
 	if(read_index) {
 		free(sizes);
@@ -3190,6 +3362,86 @@ void secondAlign(int **res,  map<int, FastaRead> &read_names, map<int, Result> &
 	delete [] res[2];
 	delete [] res;
 
+}
+
+
+void updatePrecision2(int prec) {
+	if(prec == 1) {
+		MIN_QSCORE_MULT2 = 0.1;
+		PRESCAN_QSCORE_THRESH = 0.57;
+		Z_SCORE_MULT = 20;
+		MIN_QSCORE_MULT = 0.025;
+		MIN_SCORE_MULT = 0.15;
+		DYNAMIC_SCORE_THRESH = 0.84;
+		MAX_DESIRED_KEYS = 15;
+		MIN_KEYS_DESIRED = 2;
+		MIN_KEY_DENSITY = 1.5;
+		KEY_DENSITY = 1.9;
+		MAX_KEY_DENSITY = 3.0;
+		SLOW_ALIGN_PADDING=6;
+		MAXIMUM_MAX_HITS_REDUCTION=5;
+		POINTS_MATCH = 70;
+		POINTS_MATCH2 = 100;
+		POINTS_SUB = -127;
+		POINTS_SUB2 = -51;
+		POINTS_SUB3 = -25;
+		POINTS_INS = -395;
+		//MAX_INDEL = 100;
+		//MAX_INDEL2 = 8*100;
+	}
+	else if(prec == 2) {
+		MIN_QSCORE_MULT2 = 0.1;
+		PRESCAN_QSCORE_THRESH = 0.57;
+		Z_SCORE_MULT = 20;
+		MIN_QSCORE_MULT = 0.025;
+		MIN_SCORE_MULT = 0.15;
+		DYNAMIC_SCORE_THRESH = 0.84;
+		MAX_DESIRED_KEYS = 63;
+		MIN_KEYS_DESIRED = 2;
+		MIN_KEY_DENSITY = 2.8;
+		KEY_DENSITY = 3.5;
+		MAX_KEY_DENSITY = 4.5;
+		SLOW_ALIGN_PADDING=8;
+		MAXIMUM_MAX_HITS_REDUCTION=6;
+	}
+	else if(prec == 3) {
+		MIN_QSCORE_MULT2 = 0.005;
+		PRESCAN_QSCORE_THRESH = 0.6 * 0.95;
+		Z_SCORE_MULT = 25;
+		MIN_QSCORE_MULT = 0.005;
+		MIN_SCORE_MULT = 0.02;
+		DYNAMIC_SCORE_THRESH = 0.64;
+		MAX_DESIRED_KEYS = 15;
+		MIN_KEYS_DESIRED = 2;
+		MIN_KEY_DENSITY = 1.5;
+		KEY_DENSITY = 1.9;
+		MAX_KEY_DENSITY = 3.0;
+		SLOW_ALIGN_PADDING=6;
+		MAXIMUM_MAX_HITS_REDUCTION=5;
+	}
+	else {
+		MIN_QSCORE_MULT2 = 0.005;
+		PRESCAN_QSCORE_THRESH = 0.6 * 0.95;
+		Z_SCORE_MULT = 25;
+		MIN_QSCORE_MULT = 0.005;
+		MIN_SCORE_MULT = 0.02;
+		DYNAMIC_SCORE_THRESH = 0.64;
+		MAX_DESIRED_KEYS = 63;
+		MIN_KEYS_DESIRED = 2;
+		MIN_KEY_DENSITY = 2.8;
+		KEY_DENSITY = 3.5;
+		MAX_KEY_DENSITY = 4.5;
+		SLOW_ALIGN_PADDING=8;
+		MAXIMUM_MAX_HITS_REDUCTION=6;
+		POINTS_MATCH = 90;
+		POINTS_MATCH2 = 100;
+		POINTS_SUB = -137;
+		POINTS_SUB2 = -49;
+		POINTS_SUB3 = -25;
+		POINTS_INS = -205;
+		//MAX_INDEL = 100;
+		//MAX_INDEL2 = 8*100;
+	}
 }
 
 void updatePrecision(bool prec) {
@@ -3245,7 +3497,7 @@ void writeInfo() {
 	string filename = OUTDIR + "//" + "align.info";
 	ofstream out_info(filename.c_str());
 
-	string precision = " precision set to low.";
+/*	string precision = " precision set to low.";
 	string second_phase_precision = " precision set to low.";
 	if(info.first_phase_precision) {
 		precision = " precision set to high.";
@@ -3257,8 +3509,17 @@ void writeInfo() {
 	if(info.second_phase_mode) {
 		mode = " all reads processed.";
 	}
-
+*/
 	out_info << "Elapsed execution time: " << info.total_execution_time << " seconds." << endl;
+	out_info << "Index generation time: " << info.index_generation_time << " seconds." << endl;
+	out_info << "First phase time: " << info.first_align_time2 << " seconds." << endl;
+	out_info << "Coverage time: " << info.coverage_time << " seconds." << endl;
+	out_info << "New reference time: " << info.new_ref_time << " seconds." << endl;
+	out_info << "Second ref indexing time: " << info.second_ref_indexing_time << " seconds." << endl;
+	out_info << "Second align time: " << info.second_align_time2 << " seconds." << endl;
+	out_info << "Third ref indexing time: " << info.third_ref_indexing_time << " seconds." << endl;
+	out_info << "Third align time: " << info.third_align_time2 << " seconds." << endl;
+
 	out_info << "Thread number: " << info.number_of_threads << endl;
 	out_info << "Whole genome size: " << info.genome_size << " bases." << endl;
 	out_info << "Total number of reads: " << info.read_number << endl;
@@ -3266,18 +3527,32 @@ void writeInfo() {
 	out_info << "First phase data: " << endl;
 	out_info << "\t - keylen: " << info.first_phase_keylen << endl;
 	out_info << "\t - max indel: " << info.first_phase_max_indel << endl;
-	out_info << "\t -" << precision << endl;
+	out_info << "\t - precision: " << info.first_phase_multy_precision << endl;
 	out_info << "\t - read length: " << info.first_phase_readlen << endl;
 	out_info << "Second phase data: " << endl;
 	out_info << "\t - keylen: " << info.second_phase_keylen << endl;
 	out_info << "\t - max indel: " << info.second_phase_max_indel << endl;
-	out_info << "\t -" << second_phase_precision << endl;
+	out_info << "\t - precision: " << info.second_phase_multy_precision << endl;
 	out_info << "\t - read length: " << info.second_phase_readlen << endl;
-	out_info << "\t -" << mode << endl;
+	out_info << "Third phase data: " << endl;
+	out_info << "\t - keylen: " << info.third_phase_keylen << endl;
+	out_info << "\t - max indel: " << info.third_phase_max_indel << endl;
+	out_info << "\t - precision: " << info.third_phase_multy_precision << endl;
+	out_info << "\t - read length: " << info.first_phase_readlen << endl;
+	out_info << "Mode: " << info.second_phase_mode << endl;
 	out_info << "Coverage gaplen: " << info.coverage_gaplen << endl;
 	out_info << "Coverage cutoff: " << info.coverage_threshold << endl;
 	out_info << "Coverage padding: " << info.coverage_padding << endl;
 	out_info << "New reference size: " << info.new_ref_size << endl;
+	out_info << "Unprecised reads: " << endl;
+	out_info << "\t - better: " << info.better << endl;
+	out_info << "\t - worse: " << info.worse << endl;
+	out_info << "\t - same: " << info.same << endl;
+	out_info << "\t - unfound: " << info.unfound << endl;
+	out_info << "Memory after first align: " << info.memory_after_first_align << endl;
+	out_info << "Memory after second align: " << info.memory_after_second_align << endl;
+	out_info << "Memory after third align: " << info.memory_after_third_align << endl;
+	out_info << "Memory at the end: " << info.memory_at_the_end << endl;
 }
 
 void evaluateCoverage(vector<int> &final_coverage, vector<int> &correct_coverage, string infile) {
@@ -3294,6 +3569,98 @@ void evaluateCoverage(vector<int> &final_coverage, vector<int> &correct_coverage
 	streamout << "Coverage difference: " << sum << endl;
 }
 
+void findSecondPhaseReads(vector<Read> &alignedReads, vector<Read> &secondPhaseReads,
+		vector<Result> &results, vector<Result> &doneResults) {
+
+	map<int, Result> resultsMap;
+	for(unsigned int i = 0; i < results.size(); i++) {
+		Result r = results[i];
+		std::map<int,Result>::iterator it = resultsMap.begin();
+		resultsMap.insert(it, pair<int,Result>(r.br, results[i]));
+	}
+	int num = 0;
+
+	for(unsigned int i = 0; i < alignedReads.size(); i++) {
+		Read r = alignedReads[i];
+		map<int, Result>::iterator pos = resultsMap.find(r.br);
+		Result r2 = pos->second;
+  		if(r2.maxScore * PRECISION_CUTOFF > r2.score) {
+			secondPhaseReads.push_back(r);
+			num++;
+		//	TOTAL_BASE_NUM += r.content.size();
+		}
+  		else {
+  			doneResults.push_back(r2);
+  		//	TOTAL_BASE_NUM += r.content.size();
+  			ALIGNED_BASE_NUM += r.content.size();
+  		}
+	}
+}
+
+void analyseSecondPhaseReads(vector<Read> &allReads, vector<Read> &unalignedReads,
+		vector<Read> &newAlignedReads, vector<Result> &results,
+		vector<Result> &secondResults, vector<Result> &product, vector<Result> &product2) {
+
+
+	map<int, Result> resultsMap;
+	for(unsigned int i = 0; i < results.size(); i++) {
+		Result r = results[i];
+		std::map<int,Result>::iterator it = resultsMap.begin();
+		resultsMap.insert(it, pair<int,Result>(r.br, results[i]));
+	}
+
+	map<int, Result> secondResultsMap;
+	for(unsigned int i = 0; i < secondResults.size(); i++) {
+		Result r = secondResults[i];
+		std::map<int,Result>::iterator it = secondResultsMap.begin();
+		secondResultsMap.insert(it, pair<int,Result>(r.br, secondResults[i]));
+	}
+
+	int better = 0;
+	int worse = 0;
+	int unfonud = 0;
+	int same = 0;
+
+	for(unsigned int i = 0; i < newAlignedReads.size(); i++) {
+		Read r = newAlignedReads[i];
+		map<int, Result>::iterator it2 = secondResultsMap.find(r.br);
+		Result secR = it2->second;
+		map<int, Result>::iterator it3 = resultsMap.find(r.br);
+		Result firR = it3->second;
+		if(secR.score > firR.score) {
+			product2.push_back(secR);
+			better++;
+		}
+		else if(secR.score < firR.score) {
+			product.push_back(firR);
+			worse++;
+		}
+		else {
+			product.push_back(firR);
+			same++;
+		}
+	}
+	for(unsigned int i = 0; i < unalignedReads.size(); i++) {
+		Read r = unalignedReads[i];
+		map<int, Result>::iterator it2 = resultsMap.find(r.br);
+		Result r2 = it2->second;
+		product.push_back(r2);
+		unfonud++;
+	}
+
+	info.better = better;
+	info.worse = worse;
+	info.same = same;
+	info.unfound = unfonud;
+
+	cout << "Better: " << better << endl;
+	cout << "Worse: " << worse << endl;
+	cout << "Same: " << same << endl;
+	cout << "Unfound: " << unfonud << endl;
+
+}
+
+
 int main(int argc, char *argv[]) {
 
 	timeval t3, t4;
@@ -3303,13 +3670,18 @@ int main(int argc, char *argv[]) {
 
 	if(readParams(argc, argv) < 0) exit(-1);
 
-	updatePrecision(PRECISE);
+	updatePrecision2(MULTY_PRECISION);
 
 	string genome_ref = argv[3];
 	string whole_genome;
 	bool read_index = createDirectories();
 	vector<Read> tmp_unaligned_reads;
 	vector<Read> tmp_aligned_reads;
+
+	timeval t1, t2;
+	gettimeofday(&t1, NULL);
+	long startday = t1.tv_sec;
+	long startday2 = t1.tv_usec;
 
 	int **res;
 	if(read_index) {
@@ -3320,6 +3692,13 @@ int main(int argc, char *argv[]) {
 		cout << "Creating index..." << endl;
 		res = createIndex(true, whole_genome, false, genome_ref, INDEX_LOCATION, KEYLEN, KEYSPACE, BUILD_NUMBER);
 	}
+
+	gettimeofday(&t2, NULL);
+	long endday = t2.tv_sec;
+	long endday2 = t2.tv_usec;
+	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+
+	info.index_generation_time = timefinal;
 
 	cout << "genome size: " << whole_genome.size() << endl;
 	info.genome_size = whole_genome.size();
@@ -3336,15 +3715,25 @@ int main(int argc, char *argv[]) {
 	info.read_number = reads.size();
 	info.first_phase_readlen = reads[0].content.size() / SPLIT_COUNT;
 
+
+	gettimeofday(&t1, NULL);
+	startday = t1.tv_sec;
+	startday2 = t1.tv_usec;
+
 	secondAlign(res, read_names, correct_results, whole_genome, reads, read_index, tmp_unaligned_reads, tmp_aligned_reads, results);
+
+	gettimeofday(&t2, NULL);
+	endday = t2.tv_sec;
+	endday2 = t2.tv_usec;
+	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	info.first_phase_time = timefinal;
 
 	string build = SSTR(BUILD_NUMBER);
 	unsigned int genome_size = whole_genome.size();
 
-	timeval t1, t2;
 	gettimeofday(&t1, NULL);
-	long startday = t1.tv_sec;
-	long startday2 = t1.tv_usec;
+	startday = t1.tv_sec;
+	startday2 = t1.tv_usec;
 
 	vector<int> coverage;
 	for(unsigned int i = 0; i < genome_size; i++) {
@@ -3355,12 +3744,11 @@ int main(int argc, char *argv[]) {
 	calculateCoverageFromVector(coverage, results);
 	//writeCoverageFiltered(outdir + "//" + "coverage" + build + ".cut", coverage);
 	gettimeofday(&t2, NULL);
-	gettimeofday(&t2, NULL);
-	long endday = t2.tv_sec;
-	long endday2 = t2.tv_usec;
-	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
-	gettimeofday(&t2, NULL);
+	endday = t2.tv_sec;
+	endday2 = t2.tv_usec;
+	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "Coverage calculated: " << timefinal << " seconds. " << endl;
+	info.coverage_time = timefinal;
 
 	IS_SECOND_PHASE = true;
 
@@ -3377,6 +3765,7 @@ int main(int argc, char *argv[]) {
 	endday2 = t2.tv_usec;
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "New ref written: " << timefinal << " seconds. " << endl;
+	info.new_ref_time = timefinal;
 
 	KEYLEN = KEYLEN2;
 	cout << "Creating second index..." << endl;
@@ -3388,6 +3777,7 @@ int main(int argc, char *argv[]) {
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	info.second_ref_indexing_time = timefinal;
 
 	cout << "Size of new ref: " << part_genome.size() << endl;
 	cout << "Unaligned reads: " << tmp_unaligned_reads.size() << endl;
@@ -3395,42 +3785,117 @@ int main(int argc, char *argv[]) {
 	info.new_ref_size = part_genome.size();
 	//info.aligned_read_number += tmp_aligned_reads.size();
 
+	TOTAL_BASE_NUM_PREVIOUS = TOTAL_BASE_NUM;
 	TOTAL_BASE_NUM = 0;
 	ALIGNED_BASE_NUM = 0;
 
-	if(SECOND_PHASE_MODE) {
+	/*if(SECOND_PHASE_MODE) {
 		for(unsigned int i = 0; i < reads.size(); i++) {
 			TOTAL_BASE_NUM += reads[i].content.size();
 		}
 	}
-	else {
+	else {*/
 		for(unsigned int i = 0; i < tmp_unaligned_reads.size(); i++) {
 			TOTAL_BASE_NUM += tmp_unaligned_reads[i].content.size();
 		}
-	}
+//	}
 
 	vector<Read> final_unaligned_reads;
 	vector<Read> new_aligned_reads;
 
+	FIRST_PHASE_SPLIT_COUNT = SPLIT_COUNT;
 	SPLIT_COUNT = SECOND_PHASE_SPLIT_COUNT;
-	MAX_INDEL = SECOND_PHASE_MAX_INDEL2;
+	MAX_INDEL2 = SECOND_PHASE_MAX_INDEL2;
 
 	info.second_phase_readlen = tmp_unaligned_reads[0].content.size() / SPLIT_COUNT;
 
-	updatePrecision(SECOND_PHASE_PRECISE);
+	updatePrecision2(SECOND_PHASE_MULTY_PRECISION);
 
-	results.clear();
+	vector<Result> secondResults;
 
-	cout << "main parameter: " << MIN_QSCORE_MULT2 << endl;
+	gettimeofday(&t1, NULL);
+	startday = t1.tv_sec;
+	startday2 = t1.tv_usec;
+
+	secondAlign(res, read_names, correct_results, part_genome, tmp_unaligned_reads, false,
+		final_unaligned_reads, new_aligned_reads, secondResults);
+
+	gettimeofday(&t2, NULL);
+	endday = t2.tv_sec;
+	endday2 = t2.tv_usec;
+	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	info.second_align_time = timefinal;
 
 	if(SECOND_PHASE_MODE) {
-		secondAlign(res, read_names, correct_results, part_genome, reads, false,
-			final_unaligned_reads, new_aligned_reads, results);
+
+		KEYLEN = KEYLEN3;
+		cout << "Creating third index..." << endl;
+		gettimeofday(&t1, NULL);
+		startday = t1.tv_sec;
+		startday2 = t1.tv_usec;
+		res = createIndex(true, part_genome, true, in2, INDEX_LOCATION, KEYLEN, pow(2, 2*KEYLEN), BUILD_NUMBER);
+		gettimeofday(&t2, NULL);
+		endday = t2.tv_sec;
+		endday2 = t2.tv_usec;
+		timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+		info.third_ref_indexing_time = timefinal;
 	}
-	else {
-		secondAlign(res, read_names, correct_results, part_genome, tmp_unaligned_reads, false,
-			final_unaligned_reads, new_aligned_reads, results);
+
+	//cout << "main parameter: " << MIN_QSCORE_MULT2 << endl;
+
+	gettimeofday(&t1, NULL);
+	startday = t1.tv_sec;
+	startday2 = t1.tv_usec;
+
+	if(SECOND_PHASE_MODE) {
+		IS_THIRD_PHASE = true;
+
+		updatePrecision2(THIRD_PHASE_MULTY_PRECISION);
+
+		TOTAL_BASE_NUM = TOTAL_BASE_NUM_PREVIOUS;
+		ALIGNED_BASE_NUM = 0;
+		SPLIT_COUNT = FIRST_PHASE_SPLIT_COUNT;
+		MAX_INDEL2 = THIRD_PHASE_MAX_INDEL2;
+
+		vector<Read> unprecised_unaligned_reads;
+		vector<Read> unprecised_aligned_reads;
+
+		vector<Read> secondPhaseReads;
+		vector<Result> thirdResults;
+
+		vector<Result> doneResults;
+		findSecondPhaseReads(tmp_aligned_reads, secondPhaseReads, results, doneResults);
+
+		secondAlign(res, read_names, correct_results, part_genome, secondPhaseReads, false,
+				unprecised_unaligned_reads, unprecised_aligned_reads, thirdResults);
+
+		vector<Result> product;
+		vector<Result> product2;
+
+		analyseSecondPhaseReads(secondPhaseReads, unprecised_unaligned_reads, unprecised_aligned_reads, results, thirdResults, product, product2);
+
+		Statistic ss = Statistic(tmp_aligned_reads.size());
+		writeStatistics(thirdResults, correct_results, OUTDIR + "//" + "statistics" + "y" + build + ".txt", OUTDIR + "//" + "sss" + "y" + build + ".txt", ss);
+		cout << "writen stat" << endl;
+		IS_SECOND_PHASE = false;
+		addTotalStatistics(product, correct_results, global_stat);
+		cout << "added stat" << endl;
+		IS_SECOND_PHASE = true;
+		addTotalStatistics(product2, correct_results, global_stat);
+		cout << "added total" << endl;
+		writeTotalStatistics(OUTDIR + "//" + "statistics" + "t" + build + ".txt", OUTDIR + "//" + "sss" + "t" + build + ".txt", global_stat, ssstat, ststat);
+		cout << "writen total stat" << endl;
+
 	}
+
+	info.memory_at_the_end = getValue();
+
+	gettimeofday(&t2, NULL);
+	endday = t2.tv_sec;
+	endday2 = t2.tv_usec;
+	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
+	info.unprecised_reads_time = timefinal;
+
 
 	info.aligned_read_number = info.read_number - final_unaligned_reads.size();
 
@@ -3438,19 +3903,19 @@ int main(int argc, char *argv[]) {
 	long endday3 = t4.tv_sec;
 	long endday4 = t4.tv_usec;
 	double timefinal2 = ((endday3 - startday3) * 1000000.0 + (endday4 - startday4))/ 1000000;
-
+/*
 	vector<int> final_coverage;
 	if(SECOND_PHASE_MODE) {
 		for(unsigned int i = 0; i < genome_size; i++) {
 			final_coverage.push_back(0);
 		}
-		calculateCoverageFromVector(final_coverage, results);
+		calculateCoverageFromVector(final_coverage, secondResults);
 	}
 	else {
 		for(unsigned int i = 0; i < genome_size; i++) {
 			final_coverage.push_back(coverage[i]);
 		}
-		calculateCoverageFromVector(final_coverage, results);
+		calculateCoverageFromVector(final_coverage, secondResults);
 	}
 
 	vector<int> correct_coverage;
@@ -3460,9 +3925,10 @@ int main(int argc, char *argv[]) {
 	calculateCoverageFromCig(correct_coverage, argv[2]);
 
 	evaluateCoverage(final_coverage, correct_coverage, OUTDIR + "//" + "cov" + build + ".txt");
+*/
 
-	writeInfo();
 	info.total_execution_time = timefinal2;
+	writeInfo();
 
 	cout << "Program ended." << endl;
 
