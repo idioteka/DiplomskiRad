@@ -1,28 +1,7 @@
-#include <assert.h>
-#include <ctype.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-#include <algorithm>
-#include <vector>
-#include <fstream>
-#include <sstream>
-#include <string>
-#include <map>
-#include <iostream>
-#include <string>
-#include <ctime>
-#include <cmath>
-#include <limits>
-#include <cstdlib>
-#include <pthread.h>
-#include <sys/time.h>
-#include <sys/stat.h>
 
-using namespace std;
+#include "headers.h"
 
-#define SSTR( x ) dynamic_cast< std::ostringstream & >( \
-        ( std::ostringstream() << std::dec << x ) ).str()
+#pragma once
 
 struct Statistic {
 	int total_reads;
@@ -82,7 +61,6 @@ struct Statistic {
 		finded_bases = 0;
 	}
 };
-
 
 struct Info {
 	int read_number;
@@ -178,136 +156,370 @@ struct Info {
 	}
 };
 
-static Info info;
-static Statistic global_stat;
-static map<int, int> ssstat;
-static map<int, int> ststat;
+struct Config {
 
-//	PROGRAM CONST
-static int THREAD_NUM = 4;
-static bool PRECISE = true;
-static int MULTY_PRECISION = 0;
-static int SECOND_PHASE_MULTY_PRECISION = 0;
-static int THIRD_PHASE_MULTY_PRECISION = 0;
-static bool IS_SECOND_PHASE = false;
-static bool IS_THIRD_PHASE = false;
-static int KEYLEN = 13;
-static int KEYLEN2 = 13;
-static int KEYLEN3 = 13;
-static int KEYSPACE = pow(2, 2*KEYLEN);
-static vector<int> POSITIONS_INDEX;
-static int SPLIT_COUNT = 1;
-static int FIRST_PHASE_SPLIT_COUNT = SPLIT_COUNT;
-static int SECOND_PHASE_SPLIT_COUNT = 1;
-static int TOTAL_BASE_NUM = 0;
-static int ALIGNED_BASE_NUM = 0;
-static int BUILD_NUMBER = 1;
-static int COV_THRES = 1;
-static int COV_PADDING = 100;
-static int COV_GAPLEN = 32000;
-static int SECOND_PHASE_MODE = 0;
-static bool SECOND_PHASE_PRECISE  = true;
-static int SECOND_PHASE_MAX_INDEL2 = 32000;
-static double PRECISION_CUTOFF = 0.9;
-static int TOTAL_BASE_NUM_PREVIOUS = TOTAL_BASE_NUM;
+	//	PROGRAM CONST
+	int THREAD_NUM;
+	bool PRECISE;
+	int MULTY_PRECISION;
+	int SECOND_PHASE_MULTY_PRECISION;
+	int THIRD_PHASE_MULTY_PRECISION;
+	bool IS_SECOND_PHASE;
+	bool IS_THIRD_PHASE;
+	int KEYLEN;
+	int KEYLEN2;
+	int KEYLEN3;
+	int KEYSPACE;
+	vector<int> POSITIONS_INDEX;
+	int SPLIT_COUNT;
+	int FIRST_PHASE_SPLIT_COUNT;
+	int SECOND_PHASE_SPLIT_COUNT;
+	int TOTAL_BASE_NUM;
+	int ALIGNED_BASE_NUM;
+	int BUILD_NUMBER;
+	int COV_THRES;
+	int COV_PADDING;
+	int COV_GAPLEN;
+	int SECOND_PHASE_MODE;
+	bool SECOND_PHASE_PRECISE;
+	int SECOND_PHASE_MAX_INDEL2;
+	double PRECISION_CUTOFF;
+	int TOTAL_BASE_NUM_PREVIOUS;
 
-//	INDEX CONST
-static string OUTDIR;
-static string INDEX_LOCATION;
-static bool OVERWRITE_INDEX = false;
-static int LENGTH_OF_SITES;
-static int LENGTH_OF_SIZES;
+	int TOTAL_ALIGNED_BASES;
 
-//	KEYS CONST
-static int MAX_DESIRED_KEYS = 15;
-static int MIN_KEYS_DESIRED = 2;
-static float MIN_KEY_DENSITY = 1.5;
-static float KEY_DENSITY = 1.9;
-static float MAX_KEY_DENSITY = 3.0;
-//	UPPER LIMIT FOR KEY OCCURANCE
-static int MAX_LEN = 10998;
+	//	INDEX CONST
+	string OUTDIR;
+	string INDEX_LOCATION;
+	bool OVERWRITE_INDEX;
+	long LENGTH_OF_SITES;
+	long LENGTH_OF_SIZES;
 
-//	HITS CUTOFF CONST
-static int MIN_APPROX_HITS_TO_KEEP = 1;
-static int HIT_REDUCTION_DIV = 4;
-static int MAX_HITS_REDUCTION2 = 3;
-static int MAXIMUM_MAX_HITS_REDUCTION = 5;
+	//	KEYS CONST
+	int MAX_DESIRED_KEYS;
+	int MIN_KEYS_DESIRED;
+	float MIN_KEY_DENSITY;
+	float KEY_DENSITY;
+	float MAX_KEY_DENSITY;
+	//	UPPER LIMIT FOR KEY OCCURANCE
+	int MAX_LEN;
 
-//	ALIGNER CONST
-static int Y_SCORE_MULT = 10;
-static int Z_SCORE_MULT = 25;
-static int BASE_SCORE = 100*KEYLEN;
-static float MIN_QSCORE_MULT = 0.005;
-static float MIN_QSCORE_MULT2 = 0.005;
-static float MIN_SCORE_MULT = 0.02;
-static float DYNAMIC_QSCORE_THRESH_PERFECT = 0.8;
-static float DYNAMIC_QSCORE_THRESH = 0.6;
-static float DYNAMIC_SCORE_THRESH = 0.64;
-static int MAX_INDEL = 16000;
-static int MAX_INDEL2 = 32000;
-static int THIRD_PHASE_MAX_INDEL2 = MAX_INDEL2;
-static float PRESCAN_QSCORE_THRESH = 0.6 * 0.95;
+	//	HITS CUTOFF CONST
+	int MIN_APPROX_HITS_TO_KEEP;
+	int HIT_REDUCTION_DIV;
+	int MAX_HITS_REDUCTION2;
+	int MAXIMUM_MAX_HITS_REDUCTION;
 
-static int SLOW_ALIGN_PADDING = 6;
+	//	ALIGNER CONST
+	int Y_SCORE_MULT;
+	int Z_SCORE_MULT;
+	int BASE_SCORE;
+	float MIN_QSCORE_MULT;
+	float MIN_QSCORE_MULT2;
+	float MIN_SCORE_MULT;
+	float DYNAMIC_QSCORE_THRESH_PERFECT;
+	float DYNAMIC_QSCORE_THRESH;
+	float DYNAMIC_SCORE_THRESH;
+	int MAX_INDEL;
+	int MAX_INDEL2;
+	int THIRD_PHASE_MAX_INDEL2;
+	float PRESCAN_QSCORE_THRESH;
 
-//	FILL UNLIMITED CONST
-static long TIMEMASK = 2047;
-static long SCOREMASK = -2048;
-static long MAX_TIME = 2047;
-static long BARRIER_I1 = 2;
-static long BARRIER_D1 = 3;
-static long POINTSoff_MATCH2 = 204800;
-static long POINTSoff_MATCH = 143360;
-static long POINTSoff_SUBR = -301056;
-static long POINTSoff_SUB = -260096;
-static long POINTSoff_NOCALL = 0;
-static long POINTSoff_DEL = -966656;
-static long POINTSoff_DEL2 = -67584;
-static long POINTSoff_DEL3 = -18432;
-static long POINTSoff_DEL4 = -2048;
-static long POINTSoff_DEL5 = -2048;
-static long POINTSoff_DEL_REF_N = -20480;
-static long POINTSoff_GAP = -4096;
-static long POINTSoff_INS = -808960;
-static long BADoff = -2143387648;
-static int SCOREOFFSET = 11;
+	int SLOW_ALIGN_PADDING;
 
-//	SCORE CONST
-static int SCOREZ_1KEY = 260;
-static int INDEL_PENALTY = 649;
-static int INDEL_PENALTY_MULT = 20;
-static int MAX_PENALTY_FOR_MISALIGNED_HIT = 1137;
+	//	FILL UNLIMITED CONST
+	long TIMEMASK;
+	long SCOREMASK;
+	long MAX_TIME;
+	long BARRIER_I1;
+	long BARRIER_D1;
+	long POINTSoff_MATCH2;
+	long POINTSoff_MATCH;
+	long POINTSoff_SUBR;
+	long POINTSoff_SUB;
+	long POINTSoff_NOCALL;
+	long POINTSoff_DEL;
+	long POINTSoff_DEL2;
+	long POINTSoff_DEL3;
+	long POINTSoff_DEL4;
+	long POINTSoff_DEL5;
+	long POINTSoff_DEL_REF_N;
+	long POINTSoff_GAP;
+	long POINTSoff_INS;
+	long BADoff;
+	int SCOREOFFSET;
 
-//	MATCH STRING CONST
-static int MODE_DEL = 1;
-static int MODE_INS = 2;
-static int MODE_MS = 0;
-static int MODE_SUB = 3;
-static int POINTS_MATCH = 70;
-static int POINTS_MATCH2 = 100;
-static int POINTS_INS = -395;
-static int POINTS_SUB = -127;
-static int POINTS_SUB2 = -51;
-static int POINTS_SUB3 = -25;
-static int POINTS_NOREF = 0;
-static int MASK5 = 3;
-static int TIMESLIP = 4;
-static int LIMIT_FOR_COST_5 = 80;
-static int LIMIT_FOR_COST_4 = 20;
-static int LIMIT_FOR_COST_3 = 5;
-static int POINTS_NOCALL = 0;
-static int POINTS_DEL = -472;
-static int POINTS_DEL2 = -33;
-static int POINTS_DEL3 = -9;
-static int POINTS_DEL4 = -1;
-static int POINTS_DEL5 = -1;
-//	GAP CONST
-static int MINGAP = 256;
-static int GAPLEN = 128;
-static int GAPBUFFER2 = 128;
-static int GAPBUFFER = 64;
-static char GAPC = '-';
-static int POINTS_GAP = -2;
+	//	SCORE CONST
+	int SCOREZ_1KEY;
+	int INDEL_PENALTY;
+	int INDEL_PENALTY_MULT;
+	int MAX_PENALTY_FOR_MISALIGNED_HIT;
 
-static int MAX_SUBSUMPTION_LENGTH = MAX_INDEL2;
+	//	MATCH STRING CONST
+	int MODE_DEL;
+	int MODE_INS;
+	int MODE_MS;
+	int MODE_SUB;
+	int POINTS_MATCH;
+	int POINTS_MATCH2;
+	int POINTS_INS;
+	int POINTS_SUB;
+	int POINTS_SUB2;
+	int POINTS_SUB3;
+	int POINTS_NOREF;
+	int MASK5;
+	int TIMESLIP;
+	int LIMIT_FOR_COST_5;
+	int LIMIT_FOR_COST_4;
+	int LIMIT_FOR_COST_3;
+	int POINTS_NOCALL;
+	int POINTS_DEL;
+	int POINTS_DEL2;
+	int POINTS_DEL3;
+	int POINTS_DEL4;
+	int POINTS_DEL5;
 
+	//	GAP CONST
+	int MINGAP;
+	int GAPLEN;
+	int GAPBUFFER2;
+	int GAPBUFFER;
+	char GAPC;
+	int POINTS_GAP;
+
+	int MAX_SUBSUMPTION_LENGTH;
+
+	Config() {
+		//	PROGRAM CONST
+		THREAD_NUM = 4;
+		PRECISE = true;
+		MULTY_PRECISION = 0;
+		SECOND_PHASE_MULTY_PRECISION = 0;
+		THIRD_PHASE_MULTY_PRECISION = 0;
+		IS_SECOND_PHASE = false;
+		IS_THIRD_PHASE = false;
+		KEYLEN = 13;
+		KEYLEN2 = 13;
+		KEYLEN3 = 13;
+		KEYSPACE = pow(2, 2*KEYLEN);
+		SPLIT_COUNT = 1;
+		FIRST_PHASE_SPLIT_COUNT = SPLIT_COUNT;
+		SECOND_PHASE_SPLIT_COUNT = 1;
+		TOTAL_BASE_NUM = 0;
+		ALIGNED_BASE_NUM = 0;
+		BUILD_NUMBER = 1;
+		COV_THRES = 1;
+		COV_PADDING = 100;
+		COV_GAPLEN = 32000;
+		SECOND_PHASE_MODE = 0;
+		SECOND_PHASE_PRECISE  = true;
+		SECOND_PHASE_MAX_INDEL2 = 32000;
+		PRECISION_CUTOFF = 0.9;
+		TOTAL_BASE_NUM_PREVIOUS = TOTAL_BASE_NUM;
+
+		TOTAL_ALIGNED_BASES = 0;
+
+		//	INDEX CONST
+		OVERWRITE_INDEX = false;
+		LENGTH_OF_SITES = 0;
+		LENGTH_OF_SIZES = 0;
+
+		//	KEYS CONST
+		MAX_DESIRED_KEYS = 15;
+		MIN_KEYS_DESIRED = 2;
+		MIN_KEY_DENSITY = 1.5;
+		KEY_DENSITY = 1.9;
+		MAX_KEY_DENSITY = 3.0;
+		//	UPPER LIMIT FOR KEY OCCURANCE
+		MAX_LEN = 10998;
+
+		//	HITS CUTOFF CONST
+		MIN_APPROX_HITS_TO_KEEP = 1;
+		HIT_REDUCTION_DIV = 4;
+		MAX_HITS_REDUCTION2 = 3;
+		MAXIMUM_MAX_HITS_REDUCTION = 5;
+
+		//	ALIGNER CONST
+		Y_SCORE_MULT = 10;
+		Z_SCORE_MULT = 25;
+		BASE_SCORE = 100*KEYLEN;
+		MIN_QSCORE_MULT = 0.005;
+		MIN_QSCORE_MULT2 = 0.005;
+		MIN_SCORE_MULT = 0.02;
+		DYNAMIC_QSCORE_THRESH_PERFECT = 0.8;
+		DYNAMIC_QSCORE_THRESH = 0.6;
+		DYNAMIC_SCORE_THRESH = 0.64;
+		MAX_INDEL = 16000;
+		MAX_INDEL2 = 32000;
+		THIRD_PHASE_MAX_INDEL2 = MAX_INDEL2;
+		PRESCAN_QSCORE_THRESH = 0.6 * 0.95;
+
+		SLOW_ALIGN_PADDING = 6;
+
+		//	FILL UNLIMITED CONST
+		TIMEMASK = 2047;
+		SCOREMASK = -2048;
+		MAX_TIME = 2047;
+		BARRIER_I1 = 2;
+		BARRIER_D1 = 3;
+		POINTSoff_MATCH2 = 204800;
+		POINTSoff_MATCH = 143360;
+		POINTSoff_SUBR = -301056;
+		POINTSoff_SUB = -260096;
+		POINTSoff_NOCALL = 0;
+		POINTSoff_DEL = -966656;
+		POINTSoff_DEL2 = -67584;
+		POINTSoff_DEL3 = -18432;
+		POINTSoff_DEL4 = -2048;
+		POINTSoff_DEL5 = -2048;
+		POINTSoff_DEL_REF_N = -20480;
+		POINTSoff_GAP = -4096;
+		POINTSoff_INS = -808960;
+		BADoff = -2143387648;
+		SCOREOFFSET = 11;
+
+		//	SCORE CONST
+		SCOREZ_1KEY = 260;
+		INDEL_PENALTY = 649;
+		INDEL_PENALTY_MULT = 20;
+		MAX_PENALTY_FOR_MISALIGNED_HIT = 1137;
+
+		//	MATCH STRING CONST
+		MODE_DEL = 1;
+		MODE_INS = 2;
+		MODE_MS = 0;
+		MODE_SUB = 3;
+		POINTS_MATCH = 70;
+		POINTS_MATCH2 = 100;
+		POINTS_INS = -395;
+		POINTS_SUB = -127;
+		POINTS_SUB2 = -51;
+		POINTS_SUB3 = -25;
+		POINTS_NOREF = 0;
+		MASK5 = 3;
+		TIMESLIP = 4;
+		LIMIT_FOR_COST_5 = 80;
+		LIMIT_FOR_COST_4 = 20;
+		LIMIT_FOR_COST_3 = 5;
+		POINTS_NOCALL = 0;
+		POINTS_DEL = -472;
+		POINTS_DEL2 = -33;
+		POINTS_DEL3 = -9;
+		POINTS_DEL4 = -1;
+		POINTS_DEL5 = -1;
+
+		//	GAP CONST
+		MINGAP = 256;
+		GAPLEN = 128;
+		GAPBUFFER2 = 128;
+		GAPBUFFER = 64;
+		GAPC = '-';
+		POINTS_GAP = -2;
+
+		MAX_SUBSUMPTION_LENGTH = MAX_INDEL2;
+	}
+};
+
+struct Result {
+	int br;
+	long start;
+	long stop;
+	int score;
+	int maxScore;
+	string matchString;
+	vector<long> gapArray;
+	Result(int br_, long start_, long stop_, int score_, int maxScore_) {
+		br = br_;
+		start = start_;
+		stop = stop_;
+		score = score_;
+		maxScore = maxScore_;
+	}
+};
+
+struct Read {
+	int br;
+	string content;
+	Read(int br_, string content_) {
+		br = br_;
+		content = content_;
+	}
+};
+
+struct FastaRead {
+	string name;
+	string read;
+	FastaRead(string name_, string read_) {
+		name = name_;
+		read = read_;
+	}
+};
+
+struct ReferenceSegment {
+	int br;
+	string name;
+	int start;
+	ReferenceSegment(int br_, string name_, int start_) {
+		br = br_;
+		name = name_;
+		start = start_;
+	}
+};
+
+struct ThreadData3 {
+	int thread_id;
+	long *sizes;
+	long *sites;
+	vector<Read> *reads;
+	int start;
+	int stop;
+	vector<vector<Result> > *databaseResults;
+	Config *config;
+	string *whole_genome;
+	vector<Result> *results;
+	vector<Read> *aligned_reads;
+	vector<Read> *unaligned_reads;
+	ThreadData3() {
+	}
+	ThreadData3(int thread_id_, long *sizes_, long *sites_, vector<Read> *reads_, int start_, int stop_, Config *config_, string *whole_genome_, vector<Result> *results_, vector<Read> *aligned_reads_, vector<Read> *unaligned_reads_, vector<vector<Result> > *databaseResults_) {
+		thread_id = thread_id_;
+		sizes = sizes_;
+		sites = sites_;
+		reads = reads_;
+		start = start_;
+		stop = stop_;
+		config = config_;
+		databaseResults = databaseResults_;
+		whole_genome = whole_genome_;
+		results = results_;
+		aligned_reads = aligned_reads_;
+		unaligned_reads = unaligned_reads_;
+	}
+};
+
+struct SiteScore {
+	long start;
+	long stop;
+	int score;
+	int hits;
+	bool perfect;
+	int strand;
+	vector<long> gapArray;
+	SiteScore() {
+		start = -1;
+		stop = -1;
+		score = -1;
+		hits = -1;
+		perfect = false;
+		strand = -1;
+	}
+	SiteScore(long start_, long stop_, int score_, int hits_, bool perfect_, int strand_, vector<long> gapArray_) {
+		start = start_;
+		stop = stop_;
+		score = score_;
+		hits = hits_;
+		perfect = perfect_;
+		strand = strand_;
+		gapArray = gapArray_;
+	}
+};

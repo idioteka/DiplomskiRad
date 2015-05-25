@@ -2,14 +2,17 @@
 #include "config.h"
 
 int key_num;
+static int KEYLEN;
+static int KEYSPACE;
+static int BUILD_NUMBER;
 
 struct ThreadData {
 	int thread_id;
-	int *array;
+	long *array;
 	string *whole_genome;
 	ThreadData() {
 	}
-	ThreadData(int thread_id_, int *array_, string *whole_genome_) {
+	ThreadData(int thread_id_, long *array_, string *whole_genome_) {
 		thread_id = thread_id_;
 		array = array_;
 		whole_genome = whole_genome_;
@@ -18,13 +21,13 @@ struct ThreadData {
 
 struct ThreadData2 {
 	int thread_id;
-	int *array;
-	int *sizes;
+	long *array;
+	long *sizes;
 	string *whole_genome;
 	ThreadData2() {
 
 	}
-	ThreadData2(int thread_id_, int *array_, int *sizes_, string &whole_genome_) {
+	ThreadData2(int thread_id_, long *array_, long *sizes_, string &whole_genome_) {
 		thread_id = thread_id_;
 		array = array_;
 		sizes = sizes_;
@@ -32,7 +35,7 @@ struct ThreadData2 {
 	}
 };
 
-void extractGenomeFromFile(string genome_file, string &whole_genome) {
+void extractGenomeFromFile(string genome_file, string &whole_genome, vector<ReferenceSegment> &referenceSegments) {
 
 	//whole_genome = "";
 	FILE *inGenome = fopen(genome_file.c_str(), "r");
@@ -42,36 +45,42 @@ void extractGenomeFromFile(string genome_file, string &whole_genome) {
 	}
 	char buff[256];
 
+	int oldPosition = 0;
+	int position = 0;
+	string name;
+
+	fgets(buff, 255, inGenome);
+	string tmp = buff;
+	tmp.resize(tmp.size() - 1);
+	name = tmp;
+	int br = 1;
+
 	while (fgets(buff, 255, inGenome)) {
 		// ignore lines that start with genome desc, they start with '>'
 		if (buff[0] != '>') {
 			string tmp = buff;
 			tmp.resize(tmp.size() - 1);  // remove endl
 			whole_genome += tmp;
+			position += tmp.size();
+		} else {
+			ReferenceSegment rs = ReferenceSegment(br, name, oldPosition);
+			oldPosition = position;
+			referenceSegments.push_back(rs);
+			br++;
+
+			string tmp = buff;
+			tmp.resize(tmp.size() - 1);
+			name = tmp;
 		}
 	}
-	//return whole_genome;
+
+	ReferenceSegment rs = ReferenceSegment(br, name, oldPosition);
+	referenceSegments.push_back(rs);
 }
 
-int getCodeFromBase(char base) {
-	char lower_base = tolower(base);
-	if(lower_base == 'a') {
-		return 0;
-	} else if(lower_base == 'c') {
-		return 1;
-	}
-	else if(lower_base == 'g') {
-		return 2;
-	}
-	else if(lower_base == 't') {
-		return 3;
-	}
-	else return -1;
-}
-
-int getKeyFromKmer(string &whole_genome, int start, int stop) {
+int getKeyFromKmer(string &whole_genome, long start, long stop) {
 	int key = 0;
-	for(int i = start; i < stop; i++) {
+	for(long i = start; i < stop; i++) {
 		int code = getCodeFromBase(whole_genome[i]);
 		if(code < 0) {
 			return -1;
@@ -85,14 +94,14 @@ int getKeyFromKmer(string &whole_genome, int start, int stop) {
 void *countKeys(void *threadid) {
 	ThreadData *td = (ThreadData *) threadid;
 
-	int start = 0;
-	int sum = 0;
+	long start = 0;
+	long sum = 0;
 
 	while(getCodeFromBase(td->whole_genome[0][start]) < 0) {
 		start++;
 	}
 
-	for(unsigned int i = start; i < td->whole_genome[0].size()-(KEYLEN-1); i++) {
+	for(long i = start; i < td->whole_genome[0].size()-(KEYLEN-1); i++) {
 		if(getCodeFromBase(td->whole_genome[0][i]) == (*td).thread_id) {
 			int code = getCodeFromBase(td->whole_genome[0][i]);
 			if(code >= 0) {
@@ -111,19 +120,21 @@ void *countKeys(void *threadid) {
 
 void *fillArrays(void *threadid) {
 	ThreadData2 *td = (ThreadData2 *) threadid;
-	int start = 0;
+	long start = 0;
+
+	cout << "fill arrays starting: "<< endl;
 
 	while(getCodeFromBase(td->whole_genome[0][start]) < 0) {
 		start++;
 	}
 
-	for(unsigned int i = start; i < td->whole_genome[0].size()-(KEYLEN-1); i++) {
+	for(long i = start; i < td->whole_genome[0].size()-(KEYLEN-1); i++) {
 		if(getCodeFromBase(td->whole_genome[0][i]) == (*td).thread_id) {
 			int code = getCodeFromBase(td->whole_genome[0][i]);
 			if(code >= 0) {
 				int key = getKeyFromKmer(td->whole_genome[0], i, i+KEYLEN);
 				if(key >= 0) {
-					int location = (*td).sizes[key];
+					long location = (*td).sizes[key];
 					(*td).array[location] = i;
 					(*td).sizes[key]++;
 				}
@@ -133,26 +144,26 @@ void *fillArrays(void *threadid) {
 	pthread_exit(NULL);
 }
 
-void writeSizes(int *sizes, string loc) {
+void writeSizes(long *sizes, string loc) {
 	FILE* pFile;
 	pFile = fopen(loc.c_str(), "wb");
 	//TODO check if file exist
-	fwrite(sizes, sizeof(int), KEYSPACE, pFile);
+	fwrite(sizes, sizeof(long), KEYSPACE, pFile);
 	fclose(pFile);
 }
 
-void writeSites(int *sites, int sum, string loc) {
+void writeSites(long *sites, long sum, string loc) {
 	FILE* pFile;
 	pFile = fopen(loc.c_str(), "wb");
 	//TODO check if file exist
-	fwrite(sites, sizeof(int), sum, pFile);
+	fwrite(sites, sizeof(long), sum, pFile);
 	fclose(pFile);
 }
 
-int *readArray(string filename, bool write_sum) {
+long *readArray(string filename, bool write_sum) {
 	FILE * pFile;
 	long lSize;
-	int * buffer;
+	long * buffer;
 
 	pFile = fopen ( filename.c_str() , "rb" );
 
@@ -165,14 +176,12 @@ int *readArray(string filename, bool write_sum) {
 	fseek (pFile , 0 , SEEK_END);
 	lSize = ftell (pFile);
 	if(write_sum) {
-		key_num = lSize/4;
+		key_num = lSize/8;
 	}
 	rewind (pFile);
 
 	// allocate memory to contain the whole file:
-	buffer = (int*) malloc (sizeof(char)*lSize);
-
-	//cout << "Sizes size: " << lSize << endl;
+	buffer = (long*) malloc (sizeof(char)*lSize);
 
 	// copy the file into the buffer:
 	fread (buffer,1,lSize,pFile);
@@ -183,13 +192,17 @@ int *readArray(string filename, bool write_sum) {
 	return buffer;
 }
 
-int ** readIndex(string &whole_genome, string genome_ref, string index_loc, bool part_genome) {
+long ** readIndex(string &whole_genome, string genome_ref, string index_loc, bool part_genome, Config &config, vector<ReferenceSegment> &referenceSegments) {
+
+	KEYLEN = config.KEYLEN;
+	KEYSPACE = config.KEYSPACE;
+	BUILD_NUMBER = config.BUILD_NUMBER;
 
 	timeval t1, t2;
 	gettimeofday(&t1, NULL);
 	long startday = t1.tv_sec;
 	long startday2 = t1.tv_usec;
-	extractGenomeFromFile(genome_ref, whole_genome);
+	extractGenomeFromFile(genome_ref, whole_genome, referenceSegments);
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
 	long endday2 = t2.tv_usec;
@@ -206,7 +219,7 @@ int ** readIndex(string &whole_genome, string genome_ref, string index_loc, bool
 	if(part_genome) {
 		loc = index_loc + "//" + "6sizes" + build;
 	}
-	int *sizes = readArray(loc, false);
+	long *sizes = readArray(loc, false);
 
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
@@ -221,7 +234,7 @@ int ** readIndex(string &whole_genome, string genome_ref, string index_loc, bool
 	if(part_genome) {
 		loc = index_loc + "//" + "6sites" + build;
 	}
-	int *sites = readArray(loc, true);
+	long *sites = readArray(loc, true);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
@@ -229,17 +242,17 @@ int ** readIndex(string &whole_genome, string genome_ref, string index_loc, bool
 	timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "Sites loaded: " << timefinal << " seconds." << endl;
 
-	int **result = new int*[4];
-	result[0] = new int[1];
+	long **result = new long*[4];
+	result[0] = new long[1];
 	result[0][0] = KEYSPACE;
 	result[1] = sizes;
-	result[2] = new int[1];
+	result[2] = new long[1];
 	result[2][0] = key_num;
 	result[3] = sites;
 	return result;
 }
 
-void writeInfo(int sizes, int sites, string path, string &genome) {
+void writeInfo(long sizes, long sites, string path, string &genome) {
 	//string build = SSTR(build_number);
 	ofstream ofs(path.c_str());
 	ofs << "build number: " << BUILD_NUMBER << endl;
@@ -249,14 +262,14 @@ void writeInfo(int sizes, int sites, string path, string &genome) {
 	ofs << "KEYLEN: " << KEYLEN << endl;
 }
 
-int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, string genome_ref, string index_loc, int keylen, int kspace, int build_num) {
+long ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, string genome_ref, string index_loc, Config &config, vector<ReferenceSegment> &referenceSegments) {
 
-	KEYLEN = keylen;
-	KEYSPACE = kspace;
-	BUILD_NUMBER = build_num;
+	KEYLEN = config.KEYLEN;
+	KEYSPACE = config.KEYSPACE;
+	BUILD_NUMBER = config.BUILD_NUMBER;
 
 	if(!part_genome) {
-		extractGenomeFromFile(genome_ref, whole_genome);
+		extractGenomeFromFile(genome_ref, whole_genome, referenceSegments);
 	}
 
 	timeval t1, t2;
@@ -266,7 +279,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 
 	pthread_t threads[4];
 	int rc;
-	int *sizes = new int[KEYSPACE] {0};
+	long *sizes = new long[KEYSPACE] {0};
 	pthread_attr_t attr;
 	void *status;
 	pthread_attr_init(&attr);
@@ -294,8 +307,6 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 		cout << "  exiting with status :" << status << endl;
 	}
 
-	//int *sizes = countKeys(whole_genome);
-
 	gettimeofday(&t2, NULL);
 	long endday = t2.tv_sec;
 	long endday2 = t2.tv_usec;
@@ -303,9 +314,10 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 	double timefinal = ((endday - startday) * 1000000.0 + (endday2 - startday2))/ 1000000;
 	cout << "Created sizes: " << timefinal << endl;
 
-	int sum=0;
-	for(int i = 0; i < KEYSPACE; i++) {
-		int temp = sizes[i];
+
+	long sum=0;
+	for(long i = 0; i < KEYSPACE; i++) {
+		long temp = sizes[i];
 		sizes[i] = sum;
 		sum += temp;
 	}
@@ -329,6 +341,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 		cout << "Wrote sizes: " << timefinal << endl;
 	}
 
+
 	gettimeofday(&t1, NULL);
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
@@ -339,7 +352,10 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 
 	pthread_t threads2[4];
 	ThreadData2 threadDatas2[4];
-	int *sites = new int[sum];
+
+	cout << "sum: " << sum << endl;
+
+	long *sites = new long[sum];
 	for(int i = 0; i < 4; i++) {
 		threadDatas2[i] =ThreadData2(i, sites, sizes, whole_genome);
 	}
@@ -357,7 +373,6 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 		cout << "  exiting with status :" << status << endl;
 	}
 
-	//int *sites = fillArrays(sizes, sum, whole_genome);
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
 	endday2 = t2.tv_usec;
@@ -381,7 +396,7 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 		cout << "Wrote sites: " << timefinal << endl;
 	}
 
-	for(int i = KEYSPACE-1; i > 0; i--) {
+	for(long i = KEYSPACE-1; i > 0; i--) {
 		sizes[i] = sizes[i-1];
 	}
 	sizes[0] = 0;
@@ -392,11 +407,11 @@ int ** createIndex(bool write_to_file, string &whole_genome, bool part_genome, s
 	}
 	writeInfo(KEYSPACE, sum, loc, whole_genome);
 
-	int **result = new int*[4];
-	result[0] = new int[1];
+	long **result = new long*[4];
+	result[0] = new long[1];
 	result[0][0] = KEYSPACE;
 	result[1] = sizes;
-	result[2] = new int[1];
+	result[2] = new long[1];
 	result[2][0] = sum;
 	result[3] = sites;
 	return result;

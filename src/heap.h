@@ -1,14 +1,14 @@
 
 struct Triplet {
 	int column;
-	int row;
-	int site;
+	long row;
+	long site;
 	Triplet() {
 		column = -1;
 		row = -1;
 		site = -1;
 	}
-	Triplet(int column_, int row_, int site_) {
+	Triplet(int column_, long row_, long site_) {
 		column = column_;
 		row = row_;
 		site = site_;
