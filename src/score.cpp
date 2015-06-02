@@ -211,7 +211,7 @@ int calcAffineScore(Config &config, vector<long> &loc_array, string &read) {
 	}
 	//cout << score << "\n";
 
-	/*
+
 	int var = 0;
 	for(int i = 0; i < 30; i++) {
 		if(loc_array[i] < 0) {
@@ -230,7 +230,7 @@ int calcAffineScore(Config &config, vector<long> &loc_array, string &read) {
 	if(var > 10) {
 		return 0;
 	}
-	*/
+
 
 	return score;
 }

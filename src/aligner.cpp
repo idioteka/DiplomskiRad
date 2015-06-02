@@ -458,7 +458,7 @@ void processRead(Config &config, long *sizes, long *sites, string &r1, vector<ve
 			score = align(config, bestScores, keys_reversed, read_reverse, offsets_reversed, sizes, sites, results, all_bases_covered, max_score, quick_max_score, fully_defined, 1, whole_genome);
 		}
 
-		cout << "Number of results: " << results.size() << endl;
+		//cout << "Number of results: " << results.size() << endl;
 
 		if(results.size() != 0) {
 			filterBadReads(config, score, results, read, read_reverse, sizes, sites, databaseResults, resultsFinal, whole_genome, threadId, br, max_score);
@@ -481,7 +481,7 @@ void *preProcessRead(void *threadid) {
 
 		Read read = (*(td->reads))[i];
 
-		if(true) {
+		if(false) {
 			if((i+1)%2 == 0) cout << "Read: " << read.br << " started." << endl;
 		}
 		processRead(*(td->config), td->sizes, td->sites, read.content, *(td->databaseResults), *(td->results), *(td->aligned_reads), *(td->unaligned_reads), *(td->whole_genome),  td->thread_id, read.br);
@@ -618,6 +618,8 @@ void executeMethod(Statistic global_stat, Info &info, Config &config, long **res
 	startday = t1.tv_sec;
 	startday2 = t1.tv_usec;
 	writeSamResults(tmp_results, reads, read_names, config.OUTDIR + "//" + "results" + addon + build + ".sam", referenceSegments);
+	writeResults(config, tmp_results, correct_results, config.OUTDIR + "//" + "results" + addon + build + ".txt");
+
 	if(!config.IS_SECOND_PHASE) {
 	//	writeResults(config, tmp_results, correct_results, config.OUTDIR + "//" + "results" + addon + build + ".txt");
 		//writeSamResults(tmp_results, reads, read_names, config.OUTDIR + "//" + "results" + addon + build + ".sam");
@@ -637,7 +639,7 @@ void executeMethod(Statistic global_stat, Info &info, Config &config, long **res
 	startday2 = t1.tv_usec;
 	Statistic s = Statistic(reads.size());
 
-	//writeStatistics2(config, tmp_results, correct_results, config.OUTDIR + "//" + "statistics" + addon + build + ".txt", config.OUTDIR + "//" + "sss" + addon + build + ".txt", s);
+	writeStatistics2(config, tmp_results, correct_results, config.OUTDIR + "//" + "statistics" + addon + build + ".txt", config.OUTDIR + "//" + "sss" + addon + build + ".txt", s);
 
 	gettimeofday(&t2, NULL);
 	endday = t2.tv_sec;
@@ -720,7 +722,7 @@ int main(int argc, char *argv[]) {
 	vector<Read> reads;
 	map<int, FastaRead> read_names;
 	map<int, Result> correct_results;
-	readFastaReads(reads,  argv[2],read_names);
+	readReads(config, reads, read_names, correct_results, argv[2]);
 	cout << "Read names: " << read_names.size() << endl;
 	vector<Result> results;
 

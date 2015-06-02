@@ -122,8 +122,6 @@ void *fillArrays(void *threadid) {
 	ThreadData2 *td = (ThreadData2 *) threadid;
 	long start = 0;
 
-	cout << "fill arrays starting: "<< endl;
-
 	while(getCodeFromBase(td->whole_genome[0][start]) < 0) {
 		start++;
 	}

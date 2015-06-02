@@ -513,19 +513,20 @@ void filterBadReads(Config &config, int score, vector<SiteScore> &results, strin
 	SiteScore ss;
 
 	vector<Result> filtered;
-	for(int i = 0; i < results.size(); i++) {
-		SiteScore s = results[i];
-		Result r = Result(br, s.start, s.stop, s.score, s.score);
-		if(s.strand == 0) {
-			makeMatchStringForSite(config, s, read, sizes, sites, r, whole_genome, threadId);
-		}
-		else {
-			makeMatchStringForSite(config, s, read_reverse, sizes, sites, r, whole_genome, threadId);
-		}
-		r.gapArray = s.gapArray;
-		resultsFinal.push_back(r);
-	}
-/*
+
+//	for(int i = 0; i < results.size(); i++) {
+//		SiteScore s = results[i];
+//		Result r = Result(br, s.start, s.stop, s.score, s.score);
+//		if(s.strand == 0) {
+//			makeMatchStringForSite(config, s, read, sizes, sites, r, whole_genome, threadId);
+//		}
+//		else {
+//			makeMatchStringForSite(config, s, read_reverse, sizes, sites, r, whole_genome, threadId);
+//		}
+//		r.gapArray = s.gapArray;
+//		resultsFinal.push_back(r);
+//	}
+
 	for(unsigned int i = 0; i < results.size(); i++) {
 		SiteScore s = results[i];
 		if(s.score > max_score) {
@@ -533,16 +534,16 @@ void filterBadReads(Config &config, int score, vector<SiteScore> &results, strin
 			SiteScore ress = results[i];
 			ss = results[i];
 		}
-		if (s.score > score * 0.0) {
-			Result r = Result(br, s.start, s.stop, s.score, s.score);
-			cout << "start " << s.start << endl;
-			r.gapArray = s.gapArray;
-			filtered.push_back(r);
-		}
+//		if (s.score > score * 0.0) {
+//			Result r = Result(br, s.start, s.stop, s.score, s.score);
+//			//cout << "start " << s.start << endl;
+//			r.gapArray = s.gapArray;
+//			filtered.push_back(r);
+//		}
 	}
 	Result r = Result(br, ss.start, ss.stop, ss.score, maxScore);
 	r.gapArray = ss.gapArray;
 	resultsFinal.push_back(r);
-	*/
-	databaseResults.push_back(filtered);
+
+	//databaseResults.push_back(filtered);
 }
