@@ -5,9 +5,11 @@ A program for alligning RNA sequencing reads to reference.
 ## Installation
 
 To compile and create an executable run:
+
     g++ ./src/*.cpp -lpthread -o RNAAligner
 
 Run with:
+
     RNAAligner <destination_folder> <reads_file> <genome_reference_file> -t <thread_number> -i <index_location> -c <create_index>
 
     <destination_folder> - folder where results will be stored.
